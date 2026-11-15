@@ -1,0 +1,53 @@
+{
+  "version": "0.5.1",
+  "unit": {
+    "passed": 110,
+    "failed": 0
+  },
+  "tactics": {
+    "passed": 18
+  },
+  "reviewedAIEquivalentPublicPositions": 20,
+  "productionClassic": {
+    "passed": true,
+    "steps": 8,
+    "winner": "blue",
+    "reason": "king",
+    "testToolsAbsent": true,
+    "realWebGL": true,
+    "errors": []
+  },
+  "productionRitual": {
+    "checks": [
+      "生产祭典本地对局：布阵、移动蓄力、公开、向前空斩、一次用尽后普通移动",
+      "生产棋侍：真实祭典Worker行动及回合完成，输入无玩家暗身份",
+      "生产影谋：真实祭典Worker行动及回合完成，输入无玩家暗身份",
+      "生产诡相：真实祭典Worker行动及回合完成，输入无玩家暗身份",
+      "生产无冕者：真实祭典Worker行动及回合完成，输入无玩家暗身份",
+      "切换经典AI后使用原规则，无祭典状态或技能面板"
+    ],
+    "errors": [],
+    "complete": true
+  },
+  "aiController": {
+    "checks": [
+      "真实Worker输入无敌方暗身份／seen，实际运行大师搜索",
+      "返回菜单后强制送达旧Worker回复，不会落子",
+      "重开清理旧任务，同ID棋子不受旧回复影响",
+      "玩家在AI回合认输归属正确，终局拒绝旧回复",
+      "无响应Worker在1.8秒后终止，有限启发式合法落子恢复玩家回合"
+    ],
+    "errors": []
+  },
+  "bundleSHA256": {
+    "favicon.svg": "b42a62b5ad5a7eac7472b7008a8d70c20793b6a726ea7923e244b164e607f89e",
+    "index.html": "73e1d3c2d6a6f4bca17e2f65e1b444dd4a4dd3f77d4dba8e99282fdc1d1030d2",
+    "THIRD_PARTY_NOTICES.txt": "a01c0c55167f72300aa499b527f8a8e56805b91f6ae22f4903e51eb8ecf14e36",
+    "assets/index-C2c6lccT.css": "e25aaedbdbbdcfe396b908fa7b64fe37eaa32c2f7eda7c1a00a3c1b4820fae4e",
+    "assets/index-DkWPEbSe.js": "f807b75c58b0268a776f66842ada41075be7ba417ccaf783cc3c35a7f8b29a6d",
+    "assets/ai.worker-BSQ_EdfF.js": "37ab2ebb9120bba8c74de60dbd9c707ded66bcb8508b9d6fcee2b861a738e6e9",
+    "fonts/court-serif.woff": "329233b508afe7847cdfbd0029bebb744d93b856ac1c78bc10f07f265e3dd0c8",
+    "fonts/LICENSE.txt": "849f4ea9c214fa4ac3593b770c699f387534b11ce671264c1b10d85bdcb5997b"
+  },
+  "scope": "Standalone formal game. No training UI, data collection server, storage bindings, personal chess records or service credentials."
+}

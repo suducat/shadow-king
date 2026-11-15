@@ -1,0 +1,39 @@
+const{launch,openGame,root}=require('./support.cjs'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('PASS',s);fs.writeFileSync(path.join(root,'artifacts/rite-browser-report.json'),JSON.stringify(report,null,2));};
+(async()=>{const browser=await launch();let page;try{
+ const boot=await openGame(browser,'dist-test',{deviceScaleFactor:.65});page=boot.page;report.errors=boot.errors;
+ const snap=()=>page.evaluate(()=>window.__SK_QA__.snapshot());
+ const settled=()=>page.waitForFunction(()=>{const s=window.__SK_QA__.snapshot();return s.layoutReady&&Math.abs(s.camera.angle-s.camera.desiredAngle)<.001&&s.actors.every(a=>Math.abs(a.x-a.targetX)<.01&&Math.abs(a.y-a.targetY)<.01);});
+ const fixture=async(name,mode='local')=>{await page.evaluate(([n,m])=>window.__SK_QA__.loadRitualFixture(n,m),[name,mode]);if(mode==='local')await settled();};
+ const pointer=async(x,y,height=.14)=>{await page.getByRole('button',{name:'设置',exact:true}).focus();const p=await page.evaluate(([x,y,h])=>window.__SK_QA__.project(x,y,h),[x,y,height]);await page.mouse.click(p.x,p.y);};
+ const key=async(x,y)=>{await page.locator('.sr-board button').nth(y*7+x).focus();await page.keyboard.press('Enter');};
+ const hand=async side=>{await page.waitForSelector('.handoff-screen');await page.getByRole('button',{name:`我是${side==='red'?'红':'蓝'}方，揭开帷幕`}).click();await settled();};
+ const ack=async()=>{await page.waitForSelector('.reveal-card');await page.getByRole('button',{name:'继续',exact:true}).click();};
+ await page.getByRole('button',{name:/开启棋局/}).click();assert.equal(await page.getByRole('button',{name:/经典模式/}).getAttribute('aria-pressed'),'true');await page.getByRole('button',{name:/祭典模式/}).click();
+ await page.getByRole('button',{name:/本地双人/}).click();await hand('red');assert.equal((await snap()).game.mode,'ritual');assert.equal((await snap()).altarCells,9);await page.screenshot({path:path.join(root,'artifacts/rite-deployment.png')});
+ mark('祭典模式菜单、秘密布阵和中央九格祭台；经典为默认');
+ await fixture('charge');await pointer(3,3,.8);await page.getByRole('button',{name:'蓄力',exact:true}).click();await pointer(4,3);await hand('blue');
+ let s=await snap(),guard=s.game.pieces.find(p=>p.id==='red-0');assert.equal(guard.x,4);assert.equal(guard.y,3);assert.equal(guard.revealed,true);assert.equal(s.rendered.find(p=>p.id==='red-0').role,'guard');assert.ok(guard.charging);
+ await key(6,0);await key(6,1);await hand('red');await key(2,6);await key(2,5);await hand('blue');s=await snap();guard=s.game.pieces.find(p=>p.id==='red-0');assert.equal(guard.charging,undefined);assert.equal(guard.executionUsed,false);assert.equal(s.rendered.find(p=>p.id==='red-0').role,'guard');
+ mark('真实鼠标蓄力加普通移动；对手可见；下一己方普通行动放弃但不消耗');
+ await fixture('ready');await page.getByRole('button',{name:'旋转棋盘',exact:true}).click();await settled();await pointer(3,3,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();
+ await page.waitForFunction(()=>window.__SK_QA__.snapshot().reveal);s=await snap();assert.equal(s.game.lastAction.steps.length,2);assert.deepEqual(s.game.captures.map(c=>c.id),['blue-0','blue-2']);assert.equal(s.game.ply,3);assert.equal(s.game.pieces.find(p=>p.id==='red-0').y,1);assert.equal(s.attack.execution,true);assert.equal(s.attack.dissolved,true);
+ const models=await page.evaluate(()=>window.__SK_QA__.modelState());assert.ok(models.every(p=>p.visible&&!p.hidden&&!p.zeroOpacity&&!p.disposed));assert.equal((await snap()).actors.filter(a=>['blue-0','blue-2'].includes(a.id)).length,0);
+ await ack();assert.ok((await snap()).reveal,'second reveal remains');await ack();await hand('blue');
+ mark('旋转后仍沿红方逻辑向前；连续两次吃子按序揭示，只切换一次回合，攻击模型完整');
+ await fixture('one-step');await pointer(3,3,.8);assert.equal(await page.getByRole('button',{name:'斩杀',exact:true}).isDisabled(),true);assert.match(await page.locator('#skill-reason').innerText(),/友军/);assert.equal((await snap()).game.ply,2);mark('第二格友军阻挡整招禁用，不允许一格绕过');
+ await fixture('edge');await pointer(3,1,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await hand('blue');assert.equal((await snap()).game.lastAction.steps.length,1);assert.equal((await snap()).game.pieces.find(p=>p.id==='red-0').y,0);mark('仅边界不足两格时，一格斩杀合法');
+ await fixture('empty');await pointer(3,4,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await hand('blue');await key(6,0);await key(6,1);await hand('red');await pointer(3,2,.8);s=await snap();assert.equal(s.game.pieces.find(p=>p.id==='red-0').executionUsed,true);assert.equal(await page.getByRole('button',{name:'蓄力',exact:true}).count(),0);await key(4,2);await hand('blue');assert.equal((await snap()).game.pieces.find(p=>p.id==='red-0').x,4);
+ mark('空斩消耗独立次数；后续不可蓄力但可正常移动');
+ await fixture('opening');await pointer(3,3,.8);await pointer(3,2);await ack();assert.equal((await snap()).game.result,null);await hand('blue');s=await snap();assert.equal(s.rendered.find(p=>p.id==='blue-3').role,'king');assert.equal(s.game.ritual.blue.phase,'open');
+ await key(0,0);await key(0,1);await hand('red');assert.equal((await snap()).game.ritual.blue.phase,'occupied');await key(2,6);await key(2,5);await page.waitForSelector('.ending-ritual');assert.equal((await snap()).game.result.winner,'blue');assert.equal(await page.locator('[data-cinematic=ritual]').count(),1);assert.equal(await page.locator('.result-copy h1').innerText(),'祭典登临');await page.screenshot({path:path.join(root,'artifacts/rite-victory.png')});
+ mark('最后死士触发王公开；王已在祭台仍须己方行动，再守过敌方回应；独立祭典结算');
+ await fixture('counter');await pointer(4,4,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await ack();await page.waitForSelector('.ending-king');s=await snap();assert.equal(s.game.result.winner,'red');assert.equal(s.game.lastAction.steps.length,1);assert.equal(s.game.pieces.find(p=>p.id==='red-0').y,3);assert.ok(s.game.pieces.some(p=>p.id==='blue-0'));
+ mark('回应回合斩杀祭台王：弑王优先，第二格不执行、不误删');
+ await fixture('ai-execution','ai');await page.waitForFunction(()=>window.__SK_QA__.snapshot().reveal,null,{timeout:60000});s=await snap();assert.equal(s.game.lastAction.kind,'execute');assert.equal(s.ai.fallback,false);assert.equal(s.game.lastAction.steps.length,2);assert.equal(s.game.pieces.find(p=>p.id==='blue-0').executionUsed,true);await ack();await ack();await page.waitForSelector('.ending-king');assert.equal((await snap()).game.result.winner,'blue');
+ const messages=await page.evaluate(()=>window.__AI_MESSAGES__);for(const m of messages.filter(m=>m.observation.rules.id==='shadow-king-rite-v2')){assert.ok(!('seen'in m.observation));for(const p of m.observation.pieces.filter(p=>p.side!==m.observation.side&&p.role==='unknown'))assert.ok(!('executionUsed'in p)&&!('charging'in p));}
+ mark('真实大师Worker合法两格斩杀、两次揭示、终局停止及隐藏信息隔离');
+ await page.evaluate(()=>window.__SK_QA__.loadFixture('capture','guard'));await settled();s=await snap();assert.equal(s.game.mode,undefined);assert.equal(s.altarCells,0);assert.equal(await page.locator('.guard-controls').count(),0);assert.equal(await page.locator('.ritual-status').count(),0);await pointer(3,3,.8);await pointer(4,3);await hand('blue');assert.equal((await snap()).game.ply,1);mark('切回经典后无祭台、技能与祭典UI，原有移动交接正常');
+ assert.deepEqual(report.errors,[]);report.complete=true;
+}catch(error){report.failure=error.stack;if(page){fs.writeFileSync(path.join(root,'artifacts/rite-browser-failure-state.json'),JSON.stringify(await page.evaluate(()=>window.__SK_QA__.snapshot()).catch(()=>null),null,2));await page.screenshot({path:path.join(root,'artifacts/rite-browser-failure.png')}).catch(()=>{});}throw error;}
+finally{fs.writeFileSync(path.join(root,'artifacts/rite-browser-report.json'),JSON.stringify(report,null,2));await browser.close();}})().catch(error=>{console.error(error);process.exit(1)});
