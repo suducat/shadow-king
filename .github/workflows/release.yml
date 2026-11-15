@@ -1,0 +1,57 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tested version tag
+        required: true
+        default: v0.5.1
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Validate version
+        run: '[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Package formal game
+        run: |
+          git archive --format=zip --prefix="shadow-king-${RELEASE_TAG}/" --output="shadow-king-${RELEASE_TAG}-source.zip" "$RELEASE_TAG"
+          (cd dist && zip -qr "../shadow-king-${RELEASE_TAG}-web.zip" .)
+          sha256sum "shadow-king-${RELEASE_TAG}-source.zip" "shadow-king-${RELEASE_TAG}-web.zip" > SHA256SUMS
+          cat > release-notes.md <<'NOTES'
+          《暗王 SHADOW KING》V0.5.1 正式游戏发行版。
+
+          - 本地双人、四种难度 AI、经典与独立祭典模式。
+          - 保留3D棋盘、角色、战斗、身份揭示、胜利演出及音效。
+          - 完整祭典回应验证、风险评估及合法落点点击修复。
+          - 纯静态网页，无后端或付费 API 依赖。
+          - 源码、运行说明、测试及 GitHub Actions 构建流程。
+
+          源码包解压后执行 npm ci、npm run dev。网页包请通过 HTTP/HTTPS 静态服务访问。
+          NOTES
+      - name: Publish version and download packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "暗王 Shadow King ${RELEASE_TAG} 正式版" --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" "shadow-king-${RELEASE_TAG}-source.zip" "shadow-king-${RELEASE_TAG}-web.zip" SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
