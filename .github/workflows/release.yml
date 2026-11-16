@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing tested version tag
         required: true
-        default: v0.5.1
+        default: v0.6.0
         type: string
 
 permissions:
@@ -37,11 +37,11 @@ jobs:
           (cd dist && zip -qr "../shadow-king-${RELEASE_TAG}-web.zip" .)
           sha256sum "shadow-king-${RELEASE_TAG}-source.zip" "shadow-king-${RELEASE_TAG}-web.zip" > SHA256SUMS
           cat > release-notes.md <<'NOTES'
-          《暗王 SHADOW KING》V0.5.1 正式游戏发行版。
+          《暗王 SHADOW KING》V0.6.0 正式游戏发行版。
 
-          - 本地双人、四种难度 AI、经典与独立祭典模式。
+          - 本地双人、四档公平 AI 与全知者挑战、经典与独立祭典模式。
           - 保留3D棋盘、角色、战斗、身份揭示、胜利演出及音效。
-          - 完整祭典回应验证、风险评估及合法落点点击修复。
+          - 显式隔离透视权限、独立 Worker 搜索、三档画质与棋具材质精修。
           - 纯静态网页，无后端或付费 API 依赖。
           - 源码、运行说明、测试及 GitHub Actions 构建流程。
 

@@ -1,12 +1,16 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { VisibleRole, Side } from './game';
+import {surface} from './surfaces';
+import {QUALITY,type Quality} from './quality';
+let detail:Quality='high';const segments=(n:number,min=4)=>Math.max(min,Math.round(n*QUALITY[detail].segments));
 import { bodyPickMesh } from './interaction';
 
 export type CharacterRig = { weapon: T.Group; cape: T.Group; leftArm: T.Group; rightArm: T.Group; seal: T.Group };
 export type Character = { model: T.Group; pick: T.Mesh; rig: CharacterRig };
 const V = (x:number,y:number,z:number) => new T.Vector3(x,y,z);
 function sculpt(fn:(u:number,v:number)=>T.Vector3, nu=40,nv=24) {
+  nu=segments(nu,6);nv=segments(nv,6);
   const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
   for(let j=0;j<=nv;j++)for(let i=0;i<=nu;i++) { const p=fn(i/nu,j/nv);positions.push(p.x,p.y,p.z);uvs.push(i/nu,j/nv); }
   for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const a=j*(nu+1)+i,b=a+nu+1;indices.push(a,b,a+1,b,b+1,a+1);}
@@ -15,24 +19,23 @@ function sculpt(fn:(u:number,v:number)=>T.Vector3, nu=40,nv=24) {
 function add(parent:T.Object3D,g:T.BufferGeometry,m:T.Material,position=[0,0,0],scale=[1,1,1]) {
   const o=new T.Mesh(g,m);o.position.fromArray(position);o.scale.fromArray(scale);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;
 }
-function ellipsoid(parent:T.Object3D,m:T.Material,p:number[],s:number[]) { return add(parent,new T.SphereGeometry(1,20,14),m,p,s); }
+function ellipsoid(parent:T.Object3D,m:T.Material,p:number[],s:number[]) { return add(parent,new T.SphereGeometry(1,segments(20,8),segments(14,6)),m,p,s); }
 function sweep(points:T.Vector3[],r:number|((v:number)=>number),sides=10,segments=20,flatten=1) {
   const curve=new T.CatmullRomCurve3(points),frames=curve.computeFrenetFrames(segments,false);
   return sculpt((u,v)=>{const i=Math.min(segments,Math.round(v*segments)),a=u*Math.PI*2,radius=typeof r==='number'?r:r(v);return curve.getPoint(v).addScaledVector(frames.normals[i],Math.cos(a)*radius).addScaledVector(frames.binormals[i],Math.sin(a)*radius*flatten);},sides,segments);
 }
 function cord(parent:T.Object3D,m:T.Material,points:number[][],r=.006) {return add(parent,sweep(points.map(p=>V(p[0],p[1],p[2])),r,6,Math.max(8,points.length*3)),m);}
-function turned(parent:T.Object3D,m:T.Material,profile:number[][],sides=48) {return add(parent,new T.LatheGeometry(profile.map(([r,y])=>new T.Vector2(r,y)),sides),m);}
-function disk(parent:T.Object3D,m:T.Material,r:number,y:number,tube=.006) { const o=add(parent,new T.TorusGeometry(r,tube,6,48),m,[0,y,0]);o.rotation.x=Math.PI/2;return o; }
-function emboss(parent:T.Object3D,m:T.Material,shape:T.Shape,depth=.014) {return add(parent,new T.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.008,bevelThickness:.006,curveSegments:12}),m);}
+function turned(parent:T.Object3D,m:T.Material,profile:number[][],sides=48) {return add(parent,new T.LatheGeometry(profile.map(([r,y])=>new T.Vector2(r,y)),segments(sides,16)),m);}
+function disk(parent:T.Object3D,m:T.Material,r:number,y:number,tube=.006) { const o=add(parent,new T.TorusGeometry(r,tube,4,segments(48,20)),m,[0,y,0]);o.rotation.x=Math.PI/2;return o; }
+function emboss(parent:T.Object3D,m:T.Material,shape:T.Shape,depth=.014) {return add(parent,new T.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelSegments:detail==='low'?1:2,steps:1,bevelSize:.008,bevelThickness:.006,curveSegments:segments(12,6)}),m);}
 function shieldShape(w:number,h:number){const s=new T.Shape();s.moveTo(0,-h*.55);s.bezierCurveTo(-w*.55,-h*.25,-w*.5,h*.1,-w*.42,h*.42);s.quadraticCurveTo(0,h*.65,w*.42,h*.42);s.bezierCurveTo(w*.5,h*.1,w*.55,-h*.25,0,-h*.55);return s;}
-function fabricTexture(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d')!;x.fillStyle='#888';x.fillRect(0,0,128,128);for(let i=0;i<128;i+=3){x.strokeStyle=i%2?'#aaa':'#666';x.lineWidth=.6;x.beginPath();x.moveTo(i,0);x.lineTo(i,128);x.moveTo(0,i);x.lineTo(128,i);x.stroke();}const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,4);return t;}
-function palette(side:Side){const red=side==='red',tex=fabricTexture();const m=(color:number,metalness=.7,roughness=.35)=>new T.MeshStandardMaterial({color,metalness,roughness,side:T.DoubleSide});return {
-  steel:m(red?0xa99a82:0xa2bac1,.82,.3), gold:m(0xc4a36a,.82,.28), shade:m(0x182127,.65,.42), skin:m(0x9c8d73,.65,.46),
-  cloth:new T.MeshStandardMaterial({color:red?0x592c32:0x233b50,roughness:.85,metalness:.08,bumpMap:tex,bumpScale:.008,side:T.DoubleSide}),
-  lining:new T.MeshStandardMaterial({color:red?0x9c4946:0x467286,roughness:.7,metalness:.23,side:T.DoubleSide}),
-  violet:m(0x514260,.4,.5), leather:m(0x302b2b,.15,.85),
-  magic:new T.MeshStandardMaterial({color:red?0xe7aa62:0x87c8df,emissive:red?0xc16834:0x468ead,emissiveIntensity:.7,metalness:.5,roughness:.2}),
-  purple:new T.MeshStandardMaterial({color:0xc29ad8,emissive:0x8054a5,emissiveIntensity:1.15,metalness:.4,roughness:.22}),
+function palette(side:Side){const red=side==='red',tex=detail==='low'?null:surface('fabric'),patina=detail==='low'?null:surface('metal');const m=(color:number,metalness=.7,roughness=.35)=>new T.MeshStandardMaterial({color,metalness,roughness,roughnessMap:patina,bumpMap:patina,bumpScale:.0015,side:T.DoubleSide});return {
+  steel:m(red?0xa4a8a4:0x91b4c2,.86,.46),gold:m(0xb89453,.86,.4),shade:m(0x17242a,.55,.59),skin:m(0xad9275,.06,.78),
+  cloth:new T.MeshStandardMaterial({color:red?0x68262e:0x203d59,roughness:.95,metalness:0,bumpMap:tex,bumpScale:.006,side:T.DoubleSide}),
+  lining:new T.MeshStandardMaterial({color:red?0xa84a44:0x4f829d,roughness:.87,metalness:.02,side:T.DoubleSide}),
+  violet:m(0x493951,.08,.9),leather:m(0x302726,.02,.94),
+  magic:new T.MeshStandardMaterial({color:red?0xf0c17e:0xa5e3fa,emissive:red?0xbd682e:0x408dae,emissiveIntensity:.65,metalness:.4,roughness:.22}),
+  purple:new T.MeshStandardMaterial({color:0xc3a0df,emissive:0x76509d,emissiveIntensity:.85,metalness:.35,roughness:.28}),
 };}
 type Palette=ReturnType<typeof palette>;
 function skirt(parent:T.Object3D,m:T.Material,bottom=.25,top=.13,height=.8,folds=12){
@@ -85,7 +88,8 @@ function runeRing(parent:T.Group,p:Palette,r=.22,color:T.Material=p.gold){
 }
 function base(parent:T.Group,p:Palette,role:VisibleRole){
   turned(parent,p.shade,[[0,0],[.315,0],[.35,.025],[.35,.055],[.322,.075],[.322,.105],[.30,.12],[.305,.15],[.28,.175],[0,.175]]);
-  disk(parent,p.gold,.338,.06,.008);disk(parent,p.steel,.30,.145,.008);
+  disk(parent,p.gold,.338,.06,.010);
+  for(let i=0;i<16;i++){const a=i*Math.PI/8;cord(parent,p.gold,[[Math.sin(a)*.326,.08,Math.cos(a)*.326],[Math.sin(a)*.306,.113,Math.cos(a)*.306]],.004);}disk(parent,p.steel,.30,.145,.008);
   const engraving=new T.Group();engraving.position.y=.176;parent.add(engraving);runeRing(engraving,p,.257,role==='martyr'?p.purple:p.gold);
   // Carved plaque at the front of the plinth.
   const plaque=emboss(parent,p.gold,shieldShape(.105,.08),.008);plaque.position.set(0,.077,.326);plaque.scale.setScalar(.8);
@@ -103,7 +107,7 @@ function breastplate(parent:T.Group,p:Palette,royal=false){
   if(royal){for(const s of [-1,1])cord(parent,p.gold,[[s*.02,1.09,.15],[s*.1,1.045,.17],[s*.18,1.07,.09]],.009);}
 }
 function sword(parent:T.Group,p:Palette){
-  const shape=new T.Shape();shape.moveTo(0,.86);shape.lineTo(.034,.72);shape.lineTo(.028,.12);shape.lineTo(-.028,.12);shape.lineTo(-.034,.72);shape.closePath();
+  const shape=new T.Shape();shape.moveTo(0,.86);shape.lineTo(.043,.72);shape.lineTo(.036,.12);shape.lineTo(-.036,.12);shape.lineTo(-.043,.72);shape.closePath();
   const blade=emboss(parent,p.steel,shape,.014);blade.position.z=-.006;
   cord(parent,p.gold,[[0,.15,.02],[0,.7,.021],[0,.82,.012]],.004);
   cord(parent,p.gold,[[-.12,.11,0],[-.08,.125,0],[0,.105,0],[.08,.125,0],[.12,.11,0]],.017);
@@ -204,8 +208,9 @@ function buildCharacter(role:VisibleRole,side:Side):Character {
 // Immutable render resources survive perspective handoffs. Only the currently
 // visible clone is attached to the scene; no hidden-role model is rendered.
 const templates=new Map<string,Character>();
-export function createCharacter(role:VisibleRole,side:Side):Character {
-  const key=side+':'+role;let source=templates.get(key);
+export function createCharacter(role:VisibleRole,side:Side,quality:Quality='high'):Character {
+  detail=quality;
+  const key=side+':'+role+':'+quality;let source=templates.get(key);
   if(!source){
     source=buildCharacter(role,side);
     source.model.traverse(o=>{if(o instanceof T.Mesh){o.geometry.userData.shared=true;for(const m of (Array.isArray(o.material)?o.material:[o.material])){m.userData.shared=true;for(const v of Object.values(m))if(v instanceof T.Texture)v.userData.shared=true;}}});

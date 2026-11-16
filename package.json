@@ -1,7 +1,7 @@
 {
   "name": "shadow-king",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -25,7 +25,10 @@
     "test:v04": "node tests/v04-browser.cjs",
     "test:v04:frames": "node tests/v04-frames.cjs",
     "test:ai:v05": "tsx --test tests/ai-v05.test.ts",
-    "test:ai:arena": "tsx scripts/ai-v05-arena.ts"
+    "test:ai:arena": "tsx scripts/ai-v05-arena.ts",
+    "test:omniscient": "tsx --test tests/omniscient.test.ts",
+    "test:v06:browser": "node tests/v06-browser.cjs",
+    "test:v06:arena": "node scripts/v06-arena.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

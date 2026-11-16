@@ -1,0 +1,38 @@
+{
+  "stage": "after",
+  "measurements": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 960,
+      "renderedFrames": 7,
+      "elapsedMs": 8805.099999999627,
+      "calls": 426,
+      "triangles": 240810,
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "scrollWidth": 1440,
+      "viewport": 1440,
+      "quality": "medium",
+      "devicePixelRatio": 1,
+      "cores": 3,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "renderedFrames": 13,
+      "elapsedMs": 8573.200000000186,
+      "calls": 425,
+      "triangles": 240794,
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "scrollWidth": 390,
+      "viewport": 390,
+      "quality": "medium",
+      "devicePixelRatio": 1,
+      "cores": 3,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+    }
+  ],
+  "errors": []
+}

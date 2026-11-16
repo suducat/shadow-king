@@ -1,31 +1,33 @@
 import {useEffect,useRef,useState} from 'react';
-import {decide, type Observation,type Difficulty,type Action,type Decision} from './ai';
+import {decide,sanitizeObservation,legalActions, type Observation,type Difficulty,type Action,type Decision} from './ai';
 export function useAI(observation:Observation|null,difficulty:Difficulty,paused:boolean,onSelect:(id:string)=>void,onAction:(a:Action)=>void){
  const callbacks=useRef({onSelect,onAction});callbacks.current={onSelect,onAction};
  const stopRef=useRef(()=>{}),sequence=useRef(0);
- const [thinking,setThinking]=useState(false),[diagnostic,setDiagnostic]=useState<{nodes:number;samples:number;algorithm:string;fallback:boolean}|null>(null);
+ const [thinking,setThinking]=useState(false),[diagnostic,setDiagnostic]=useState<{nodes:number;samples:number;algorithm:string;elapsed:number;fallback:boolean}|null>(null);
  useEffect(()=>{
   if(!observation||paused){setThinking(false);return;}
   let alive=true,settled=false,worker:Worker|undefined,wait:ReturnType<typeof setTimeout>|undefined,limit:ReturnType<typeof setTimeout>|undefined;
+  let readyFallback:Decision|undefined;
   const token=++sequence.current,began=performance.now();setThinking(true);
   const valid=()=>alive&&sequence.current===token;
   const accept=(decision:Decision,fallback=false)=>{
    if(!valid()||settled)return;settled=true;worker?.terminate();clearTimeout(limit);
-   setDiagnostic({nodes:decision.nodes,samples:decision.samples,algorithm:decision.algorithm,fallback});
+   setDiagnostic({nodes:decision.nodes,samples:decision.samples,algorithm:decision.algorithm,elapsed:decision.elapsed,fallback});
    if(!decision.action){setThinking(false);return;}
    const action=decision.action;
    wait=setTimeout(()=>{if(!valid())return;callbacks.current.onSelect(action.id);
     wait=setTimeout(()=>{if(!valid())return;setThinking(false);callbacks.current.onAction(action);},200);
    },Math.max(0,380-(performance.now()-began)));
   };
-  const fallback=()=>{if(valid()&&!settled)accept(decide(observation,'easy',{seed:observation.ply+71,maxMillis:16,nodeBudget:100}),true);};
+  const fallback=()=>{if(!valid()||settled)return;const safe=sanitizeObservation(observation);accept(difficulty==='omniscient'?(readyFallback??{action:legalActions(safe)[0]??null,nodes:0,samples:0,elapsed:0,algorithm:'Worker unavailable: legal first-action recovery'}):decide(safe,'easy',{seed:observation.ply+71,maxMillis:16,nodeBudget:100}),true);};
   // The watchdog terminates a wedged Worker. The fallback uses the finite
-  // public belief with a 16ms soft cutoff and 100 search nodes; engine validation still applies.
+  // public belief for ordinary levels. Omniscient search and its safety fallback
+  // both run in the Worker; Worker failure only chooses an already-legal action.
   try{
    worker=new Worker(new URL('./ai.worker.ts',import.meta.url),{type:'module'});
-   worker.onmessage=e=>{if(!valid()||e.data.id!==token)return;if(e.data.error)fallback();else accept(e.data.decision);};
+   worker.onmessage=e=>{if(!valid()||e.data.id!==token)return;if(e.data.fallback){readyFallback=e.data.fallback;return;}if(e.data.error)fallback();else accept(e.data.decision);};
    worker.onerror=e=>{e.preventDefault();fallback();};
-   limit=setTimeout(()=>{if(valid()&&!settled){worker?.terminate();fallback();}},1800);
+   limit=setTimeout(()=>{if(valid()&&!settled){worker?.terminate();fallback();}},difficulty==='omniscient'?5600:1800);
    worker.postMessage({id:token,observation,difficulty,seed:Math.floor(Math.random()*0xffffffff)});
   }catch{fallback();}
   const stop=()=>{alive=false;sequence.current++;worker?.terminate();clearTimeout(wait);clearTimeout(limit);};

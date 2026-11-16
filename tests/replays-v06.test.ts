@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {act,type Game} from '../src/game';
+for(const version of ['initial','final'])test(`V0.6 ${version}: replay every published paired game, including losses/draws; exactly one legal action per ply`,()=>{
+ const data=JSON.parse(fs.readFileSync(new URL(`../docs/v0.6/data/${version}-arena.json`,import.meta.url),'utf8'));assert.equal(data.completed,24);assert.equal(data.planned,24);assert.deepEqual(data.failures,[]);
+ for(const record of data.records){let g=record.initial as Game;for(const row of record.moves){assert.equal(g.result,null,'No action after terminal result');assert.equal(row.ply,g.ply);const n=act(g,row.action);assert.notEqual(n,g,'Every recorded action is legal');assert.equal(n.ply,g.ply+1);assert.equal(new Set(n.pieces.map(p=>p.id)).size,n.pieces.length);assert.equal(new Set(n.pieces.map(p=>`${p.x}/${p.y}`)).size,n.pieces.length);g=n;}assert.deepEqual(g.result,record.result);assert.equal(g.ply,record.plies);assert.deepEqual(g.pieces,record.final.pieces);}
+});

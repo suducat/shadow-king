@@ -1,0 +1,400 @@
+{
+  "completed": 24,
+  "planned": 24,
+  "sourceSha256": "f8e64da4071563f35cf88aeb97590538dba2d791f3dd7ccaf258f74cf5013b9d",
+  "budget": "Actual browser module Worker; production 1900/4200ms omniscient and 650ms master, unchanged node caps; no artificial presentation delay",
+  "seeds": [
+    63017,
+    70936
+  ],
+  "concurrency": 2,
+  "confidenceMethod": "Two-sided Wilson 95% for outright wins / ALL games (draws remain in denominator). Color-swapped pairs are correlated, not independent player-population samples. No statistical superiority claim from small samples.",
+  "summary": {
+    "games": 24,
+    "wins": 20,
+    "losses": 0,
+    "draws": 4,
+    "truncated": 0,
+    "winRate": 0.8333333333333334,
+    "winRateWilson95": [
+      0.6414692935030154,
+      0.9332132367136688
+    ],
+    "scoreRate": 0.9166666666666666,
+    "meanPlies": 55.041666666666664,
+    "illegal": 0,
+    "thinking": {
+      "actions": 663,
+      "meanMs": 2438.7942684766185,
+      "medianMs": 1900.2000000001863,
+      "p95Ms": 4201.299999999814,
+      "maxMs": 4280.5
+    },
+    "endings": {
+      "martyr": 2,
+      "quiet": 3,
+      "repetition": 1,
+      "king": 16,
+      "ritual": 2
+    }
+  },
+  "groups": {
+    "classic/master": {
+      "games": 4,
+      "wins": 2,
+      "losses": 0,
+      "draws": 2,
+      "truncated": 0,
+      "winRate": 0.5,
+      "winRateWilson95": [
+        0.1500389891521544,
+        0.8499610108478456
+      ],
+      "scoreRate": 0.75,
+      "meanPlies": 113.5,
+      "illegal": 0,
+      "thinking": {
+        "actions": 226,
+        "meanMs": 2134.4044247787565,
+        "medianMs": 1900.1000000000931,
+        "p95Ms": 4201.799999999814,
+        "maxMs": 4238.5
+      },
+      "endings": {
+        "martyr": 2,
+        "quiet": 1,
+        "repetition": 1
+      }
+    },
+    "classic/rush": {
+      "games": 4,
+      "wins": 4,
+      "losses": 0,
+      "draws": 0,
+      "truncated": 0,
+      "winRate": 1,
+      "winRateWilson95": [
+        0.5101091635454165,
+        1
+      ],
+      "scoreRate": 1,
+      "meanPlies": 23,
+      "illegal": 0,
+      "thinking": {
+        "actions": 47,
+        "meanMs": 2621.972340425526,
+        "medianMs": 1900.3999999999069,
+        "p95Ms": 4200.200000000186,
+        "maxMs": 4200.600000000093
+      },
+      "endings": {
+        "king": 4
+      }
+    },
+    "classic/defender": {
+      "games": 4,
+      "wins": 4,
+      "losses": 0,
+      "draws": 0,
+      "truncated": 0,
+      "winRate": 1,
+      "winRateWilson95": [
+        0.5101091635454165,
+        1
+      ],
+      "scoreRate": 1,
+      "meanPlies": 18,
+      "illegal": 0,
+      "thinking": {
+        "actions": 37,
+        "meanMs": 1696.5999999999672,
+        "medianMs": 1900,
+        "p95Ms": 1904.6000000000931,
+        "maxMs": 1908.6000000000931
+      },
+      "endings": {
+        "king": 4
+      }
+    },
+    "ritual/master": {
+      "games": 4,
+      "wins": 2,
+      "losses": 0,
+      "draws": 2,
+      "truncated": 0,
+      "winRate": 0.5,
+      "winRateWilson95": [
+        0.1500389891521544,
+        0.8499610108478456
+      ],
+      "scoreRate": 0.75,
+      "meanPlies": 149.75,
+      "illegal": 0,
+      "thinking": {
+        "actions": 299,
+        "meanMs": 2810.1886287625475,
+        "medianMs": 1902.2999999998137,
+        "p95Ms": 4201.899999999907,
+        "maxMs": 4237.899999999907
+      },
+      "endings": {
+        "ritual": 2,
+        "quiet": 2
+      }
+    },
+    "ritual/rush": {
+      "games": 4,
+      "wins": 4,
+      "losses": 0,
+      "draws": 0,
+      "truncated": 0,
+      "winRate": 1,
+      "winRateWilson95": [
+        0.5101091635454165,
+        1
+      ],
+      "scoreRate": 1,
+      "meanPlies": 15.5,
+      "illegal": 0,
+      "thinking": {
+        "actions": 32,
+        "meanMs": 2170.6656250000087,
+        "medianMs": 1900.2999999998137,
+        "p95Ms": 4204.5,
+        "maxMs": 4280.5
+      },
+      "endings": {
+        "king": 4
+      }
+    },
+    "ritual/defender": {
+      "games": 4,
+      "wins": 4,
+      "losses": 0,
+      "draws": 0,
+      "truncated": 0,
+      "winRate": 1,
+      "winRateWilson95": [
+        0.5101091635454165,
+        1
+      ],
+      "scoreRate": 1,
+      "meanPlies": 10.5,
+      "illegal": 0,
+      "thinking": {
+        "actions": 22,
+        "meanMs": 1765.0272727272134,
+        "medianMs": 1900.1000000000931,
+        "p95Ms": 4200,
+        "maxMs": 4201.5999999996275
+      },
+      "endings": {
+        "king": 4
+      }
+    }
+  },
+  "modes": {
+    "classic": {
+      "games": 12,
+      "wins": 10,
+      "losses": 0,
+      "draws": 2,
+      "truncated": 0,
+      "winRate": 0.8333333333333334,
+      "winRateWilson95": [
+        0.5519691377470349,
+        0.9530348578161448
+      ],
+      "scoreRate": 0.9166666666666666,
+      "meanPlies": 51.5,
+      "illegal": 0,
+      "thinking": {
+        "actions": 310,
+        "meanMs": 2156.071935483863,
+        "medianMs": 1900.1000000000931,
+        "p95Ms": 4201,
+        "maxMs": 4238.5
+      },
+      "endings": {
+        "martyr": 2,
+        "quiet": 1,
+        "repetition": 1,
+        "king": 8
+      }
+    },
+    "ritual": {
+      "games": 12,
+      "wins": 10,
+      "losses": 0,
+      "draws": 2,
+      "truncated": 0,
+      "winRate": 0.8333333333333334,
+      "winRateWilson95": [
+        0.5519691377470349,
+        0.9530348578161448
+      ],
+      "scoreRate": 0.9166666666666666,
+      "meanPlies": 58.583333333333336,
+      "illegal": 0,
+      "thinking": {
+        "actions": 353,
+        "meanMs": 2687.0773371104838,
+        "medianMs": 1900.7000000001863,
+        "p95Ms": 4201.899999999907,
+        "maxMs": 4280.5
+      },
+      "endings": {
+        "ritual": 2,
+        "quiet": 2,
+        "king": 8
+      }
+    }
+  },
+  "thinkingByAgent": {
+    "omniscient": {
+      "actions": 663,
+      "meanMs": 2438.7942684766185,
+      "medianMs": 1900.2000000001863,
+      "p95Ms": 4201.299999999814,
+      "maxMs": 4280.5
+    },
+    "master": {
+      "actions": 528,
+      "meanMs": 128.310606060584,
+      "medianMs": 98.3000000002794,
+      "p95Ms": 349.6999999997206,
+      "maxMs": 680.1000000000931
+    }
+  },
+  "first": {
+    "games": 12,
+    "wins": 11,
+    "losses": 0,
+    "draws": 1,
+    "truncated": 0,
+    "winRate": 0.9166666666666666,
+    "winRateWilson95": [
+      0.646120088858892,
+      0.9851349055950824
+    ],
+    "scoreRate": 0.9583333333333334,
+    "meanPlies": 42.833333333333336,
+    "illegal": 0,
+    "thinking": {
+      "actions": 261,
+      "meanMs": 2177.9570881226064,
+      "medianMs": 1900.1000000000931,
+      "p95Ms": 4200.799999999814,
+      "maxMs": 4204.5
+    },
+    "endings": {
+      "martyr": 1,
+      "repetition": 1,
+      "king": 8,
+      "ritual": 2
+    }
+  },
+  "second": {
+    "games": 12,
+    "wins": 9,
+    "losses": 0,
+    "draws": 3,
+    "truncated": 0,
+    "winRate": 0.75,
+    "winRateWilson95": [
+      0.46769466506644175,
+      0.9110583316059429
+    ],
+    "scoreRate": 0.875,
+    "meanPlies": 67.25,
+    "illegal": 0,
+    "thinking": {
+      "actions": 402,
+      "meanMs": 2608.143781094522,
+      "medianMs": 1900.8999999999069,
+      "p95Ms": 4202.5999999996275,
+      "maxMs": 4280.5
+    },
+    "endings": {
+      "quiet": 3,
+      "king": 8,
+      "martyr": 1
+    }
+  },
+  "failures": [],
+  "losses": [],
+  "size": {
+    "before": {
+      "rawBytes": 1245532,
+      "gzipBytes": 545170,
+      "files": [
+        {
+          "path": "assets/ai.worker-BSQ_EdfF.js",
+          "bytes": 20123,
+          "gzip": 7722
+        },
+        {
+          "path": "assets/index-BNYO_DNQ.js",
+          "bytes": 894217,
+          "gzip": 253090
+        },
+        {
+          "path": "assets/index-DvVJIRot.css",
+          "bytes": 61192,
+          "gzip": 14485
+        },
+        {
+          "path": "favicon.svg",
+          "bytes": 274,
+          "gzip": 214
+        },
+        {
+          "path": "fonts/court-serif.woff",
+          "bytes": 269104,
+          "gzip": 269188
+        },
+        {
+          "path": "index.html",
+          "bytes": 622,
+          "gzip": 471
+        }
+      ]
+    },
+    "after": {
+      "rawBytes": 1273119,
+      "gzipBytes": 553880,
+      "files": [
+        {
+          "path": "assets/ai.worker-CvSaXzvM.js",
+          "bytes": 27248,
+          "gzip": 10451
+        },
+        {
+          "path": "assets/index-_fPaWWiD.css",
+          "bytes": 71011,
+          "gzip": 16729
+        },
+        {
+          "path": "assets/index-eCtsrqZt.js",
+          "bytes": 904860,
+          "gzip": 256829
+        },
+        {
+          "path": "favicon.svg",
+          "bytes": 274,
+          "gzip": 214
+        },
+        {
+          "path": "fonts/court-serif.woff",
+          "bytes": 269104,
+          "gzip": 269188
+        },
+        {
+          "path": "index.html",
+          "bytes": 622,
+          "gzip": 469
+        }
+      ]
+    }
+  }
+}

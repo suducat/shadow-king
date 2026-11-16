@@ -33,3 +33,5 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 V0.2 includes Court Serif, a renamed character subset of Noto Serif CJK SC (Google / Adobe), licensed under SIL OFL 1.1. Original notices and full license: public/fonts/LICENSE.txt. This font is served locally; no Google Fonts request is required.
+
+V0.6: stone grain, metal patina, fabric normal/bump patterns, contact projections, engraved bases and UI seals are original procedural/code-authored artwork included in this repository. No downloaded character models, paid services, API keys or external texture requests are added. Existing Lucide ISC and Court Serif OFL notices continue to apply.

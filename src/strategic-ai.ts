@@ -2,10 +2,10 @@ import {allActions,act,other,type Game} from './game';
 import {resolveRitual} from './ritual';
 import {inferIdentities,sampleWorlds,worldGame} from './belief';
 import {evaluateStrategy,actionOrder,habitCost,attacks} from './strategy-eval';
-import type {Observation,Difficulty,SearchOptions,Decision,Action} from './ai';
+import type {Observation,StandardDifficulty,SearchOptions,Decision,Action} from './ai';
 import {forcedRiteLoss} from './rite-proof';
 const rngFor=(seed:number)=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-export function decideStrategic(o:Observation,difficulty:Difficulty,options:SearchOptions={}):Decision{
+export function decideStrategic(o:Observation,difficulty:StandardDifficulty,options:SearchOptions={}):Decision{
  const start=performance.now(),rng=rngFor(options.seed??1),belief=inferIdentities(o,difficulty==='hard'||difficulty==='master');
  const maxMillis=options.maxMillis??({easy:20,normal:100,hard:220,master:650}[difficulty]),limit=start+maxMillis,budget=options.nodeBudget??({easy:120,normal:600,hard:1800,master:5000}[difficulty]);let nodes=0,depth=1,rounds=0,inferenceStates=0;
  const first=o.history[0];const style=difficulty==='master'?(first?(first.from.x*7+first.to.x+first.to.y)%4:(options.seed??1)%4):0;

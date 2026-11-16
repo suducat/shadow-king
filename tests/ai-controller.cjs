@@ -4,7 +4,7 @@ const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('P
  const boot=await openGame(browser,'dist-test',{deviceScaleFactor:.5});page=boot.page;report.errors=boot.errors;
  const snap=()=>page.evaluate(()=>window.__SK_QA__.snapshot());
  const cell=async(x,y)=>{await page.locator('.sr-board button').nth(y*7+x).focus();await page.keyboard.press('Enter')};
- const start=async()=>{await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();await page.getByRole('button',{name:/无冕者/}).click();await page.getByRole('button',{name:'确认布阵'}).click();};
+ const start=async()=>{await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();await page.getByRole('button',{name:/无冕者/}).click();await page.getByRole('button',{name:'开始布阵',exact:true}).click();await page.getByRole('button',{name:'确认布阵'}).click();};
  await start();await cell(3,6);await cell(3,5);await page.waitForFunction(()=>{const s=window.__SK_QA__.snapshot();return s.game.ply===2&&!s.busy;},null,{timeout:30000});
  const messages=await page.evaluate(()=>window.__AI_MESSAGES__);assert.ok(messages.length);
  for(const m of messages){assert.ok(!('seen'in m.observation));assert.ok(m.observation.pieces.every(p=>p.side===m.observation.side?p.role!=='unknown':p.role==='unknown'));}

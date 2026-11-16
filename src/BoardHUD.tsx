@@ -1,5 +1,5 @@
 import {useEffect,useRef,type RefObject} from 'react';
-import {Crown,ShieldCheck,Swords,Sparkles,X} from 'lucide-react';
+import {Crown,ShieldCheck,Swords,Sparkles,X,AlertTriangle} from 'lucide-react';
 import type {BoardScene} from './scene';
 import type {Game,VisiblePiece} from './game';
 import {executionPath,type GameAction} from './ritual';
@@ -15,7 +15,9 @@ export function BoardHUD({scene,game,pieces,selected,legal,chargeIntent,canAct,c
  const panel=useRef<HTMLDivElement>(null),labels=useRef(new Map<string,HTMLDivElement>());
  const guard=canAct&&selected?.role==='guard'?selected:undefined;
  const reason=guard?executionReason(game,guard):'',path=guard?executionPath({pieces:game.pieces},guard.id):[];
- const badges=pieces.filter(p=>p.charging||(p.role==='king'&&p.revealed&&game.ritual?.[p.side].phase!=='dormant'));
+ const threatened=(p:VisiblePiece)=>pieces.some(q=>q.side!==p.side&&(Math.abs(q.x-p.x)+Math.abs(q.y-p.y)===1||q.role==='guard'&&q.charging&&executionPath({pieces},q.id).some(t=>t.x===p.x&&t.y===p.y)));
+ const danger=(p:VisiblePiece)=>p.role!=='unknown'&&(p.role==='king'||p.id===selected?.id)&&threatened(p);
+ const badges=pieces.filter(p=>danger(p)||p.charging||(p.role==='king'&&p.revealed&&game.ritual?.[p.side].phase!=='dormant'));
  useEffect(()=>{
   let frame=0;const tick=()=>{
    const board=scene.current;
@@ -35,7 +37,7 @@ export function BoardHUD({scene,game,pieces,selected,legal,chargeIntent,canAct,c
   };tick();return()=>cancelAnimationFrame(frame);
  },[scene,guard?.id,legal,chargeIntent,badges]);
  return <div className="board-hud" aria-label="祭典棋盘状态">
-  {badges.map(p=>{const king=p.role==='king',ready=!!p.charging&&game.turn===p.side&&p.charging.readyPly<=game.ply;return <div key={p.id} ref={el=>{if(el)labels.current.set(p.id,el);else labels.current.delete(p.id);}} className={`piece-status ${king?'royal-rite':ready?'skill-ready':'skill-charged'}`} data-piece-id={p.id}>{king?<Crown size={12}/>:<ShieldCheck size={12}/>}<span>{king?(game.ritual?.[p.side].phase==='occupied'?'祭台占领中':'祭典王印'):ready?'斩杀就绪':'蓄力完成'}</span></div>;})}
+  {badges.map(p=>{const king=p.role==='king'&&p.revealed&&game.ritual?.[p.side].phase!=='dormant',warning=!king&&!p.charging&&danger(p),ready=!!p.charging&&game.turn===p.side&&p.charging.readyPly<=game.ply;return <div key={p.id} ref={el=>{if(el)labels.current.set(p.id,el);else labels.current.delete(p.id);}} className={`piece-status ${warning?'piece-danger':king?'royal-rite':ready?'skill-ready':'skill-charged'}`} data-piece-id={p.id}>{warning?<AlertTriangle size={12}/>:king?<Crown size={12}/>:<ShieldCheck size={12}/>}<span>{warning?'受威胁':king?(game.ritual?.[p.side].phase==='occupied'?'祭台占领中':'祭典王印'):ready?'斩杀就绪':'蓄力完成'}</span></div>;})}
   {guard&&<div ref={panel} className={`skill-context guard-controls ${guard.charging?'ready':''}`} role="group" aria-label="影卫技能" data-piece-id={guard.id}>
    <div className="skill-title"><span><Swords size={15}/>影卫 · 秘剑</span><button aria-label="关闭技能面板" onClick={cancel}><X size={16}/></button></div>
    {guard.executionUsed?<p className="skill-spent"><ShieldCheck size={15}/>斩杀已使用<span>仍可普通移动与吃子</span></p>:chargeIntent?<><p className="charge-instruction">正在蓄力 · 选择亮起格子移动，或原地完成本次行动。</p><button className="skill-button" onClick={()=>execute({id:guard.id,x:guard.x,y:guard.y,kind:'charge'})}><Sparkles size={17}/>原地完成蓄力</button><button className="skill-cancel" onClick={cancel}>取消蓄力选择</button></>:guard.charging?<><p className="skill-state">斩杀就绪 · 本影卫剩余 1 次</p><button className="skill-button execute-skill" aria-label="斩杀" disabled={!!reason} aria-describedby="skill-reason" onClick={()=>{const to=path.at(-1);if(to)execute({id:guard.id,x:to.x,y:to.y,kind:'execute'});}}><Swords size={18}/>斩杀{!reason&&<small>向前 {path.length} 格</small>}</button><p id="skill-reason">{reason||'固定向前两格；仅边界不足时前进一格。普通行动将放弃蓄力。'}</p></>:<><button className="skill-button" aria-label="蓄力" onClick={charge}><Sparkles size={18}/>蓄力<small>剩余 1 次</small></button><p>本回合移动或原地蓄力，身份永久公开；下一己方回合斩杀。</p></>}

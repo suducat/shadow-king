@@ -1,9 +1,10 @@
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 async function openGame(browser,dir='dist-test',opts={},qa=true){
+ if(dir==='dist-test'&&process.env.SK_TEST_DIST)dir=process.env.SK_TEST_DIST;
  const context=await browser.newContext({viewport:{width:1280,height:840},deviceScaleFactor:1,reducedMotion:'no-preference',...opts});context.setDefaultTimeout(60000);
- const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('ERR_FAILED'))errors.push(m.text())});
- await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname!=='shadow-king.test')return route.abort();const f=path.join(root,dir,u.pathname==='/'?'index.html':decodeURIComponent(u.pathname));try{await route.fulfill({status:200,contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff':'font/woff'})[path.extname(f)]||'text/plain',body:fs.readFileSync(f)});}catch{await route.fulfill({status:404,body:'not found'})}});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if((m.type()==='error'||m.type()==='warning'&&m.text().includes('THREE.Material:'))&&!m.text().includes('ERR_FAILED'))errors.push(m.text())});
+ await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname!=='shadow-king.test')return route.abort();const f=path.join(path.resolve(root,dir),u.pathname==='/'?'index.html':decodeURIComponent(u.pathname));try{await route.fulfill({status:200,contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff':'font/woff'})[path.extname(f)]||'text/plain',body:fs.readFileSync(f)});}catch{await route.fulfill({status:404,body:'not found'})}});
  await page.addInitScript(()=>{
   localStorage.setItem('shadow-king-settings',JSON.stringify({reduced:true,music:0,effects:0,muted:true,cinematic:false}));
   const OriginalWorker=window.Worker;window.__AI_MESSAGES__=[];window.__AI_RESULTS__=[];

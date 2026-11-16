@@ -1,0 +1,92 @@
+import {act,allActions,other,positionKey,type Game,type Side} from './game';
+import {observe,sanitizeObservation,legalActions,random,type Observation,type Action,type SearchOptions,type Decision,type PublicAction} from './ai';
+import {inferIdentities,sampleWorlds,worldGame} from './belief';
+import {evaluateStrategy,actionOrder,attacks,habitCost} from './strategy-eval';
+import {forcedRiteLoss} from './rite-proof';
+const actionKey=(a:Action)=>`${a.id}/${a.x}/${a.y}/${a.kind??'move'}`;
+const hash=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;};
+export type OpponentChoice={action:Action;probability:number;score:number;forcing:boolean};
+// This function's sole input is the PLAYER'S public observation, not the
+// omniscient observation. Policy weights cannot inspect the AI's dark roles.
+export function opponentPolicy(input:Observation,expired:()=>boolean=()=>false,onStep:()=>void=()=>{}):OpponentChoice[]{
+ const o=sanitizeObservation(input),belief=inferIdentities(o),rng=random(hash(JSON.stringify(o))),worlds=sampleWorlds(belief,3,rng),games=worlds.map(w=>worldGame(o,belief,w));
+ const legal=legalActions(o),danger=attacks(games[0],other(o.side)),own=o.pieces.filter(p=>p.side===o.side),guards=own.filter(p=>p.role==='guard').length;
+ const scores=legal.map(a=>{
+  const p=own.find(p=>p.id===a.id)!,capture=o.pieces.some(p=>p.side!==o.side&&p.x===a.x&&p.y===a.y),forcing=capture||a.kind==='execute'||(p.role==='king'||p.role==='guard'&&guards===1)&&danger.has(`${p.x}/${p.y}`);
+  let total=0,n=0;for(const g of games){if(expired())break;const next=act(g,a);onStep();total+=next.result?(next.result.winner===o.side?6000:next.result.winner===null?0:-18000):evaluateStrategy(next,o.side);n++;}
+  return{action:a,score:(n?total/n:actionOrder(games[0],a))-habitCost(o,a),forcing};
+ });
+ const best=Math.max(...scores.map(s=>s.score)),weights=scores.map(s=>Math.exp(Math.max(-12,(s.score-best)/340))),sum=weights.reduce((a,b)=>a+b,0)||1;
+ return scores.map((s,i)=>({...s,probability:.96*weights[i]/sum+.04/Math.max(1,scores.length)})).sort((a,b)=>b.probability-a.probability);
+}
+function append(g:Game,a:Action,n:Game,h:PublicAction[]):PublicAction[]{const p=g.pieces.find(p=>p.id===a.id)!,end=n.pieces.find(p=>p.id===a.id)!,caps=n.captures.slice(g.captures.length);return[...h,{id:a.id,side:p.side,from:{x:p.x,y:p.y},to:{x:end.x,y:end.y},...(a.kind?{kind:a.kind}:{}),...(caps.length?{captured:caps.at(-1)!.role}:{})}];}
+// Repetition since the last capture can be reconstructed without extra private
+// engine fields: piece inventory is constant and all movement is public.
+function restoreClassicRepetition(g:Game,h:PublicAction[]){if(g.mode==='ritual')return;const copy={...g,pieces:g.pieces.map(p=>({...p}))},seen:Record<string,number>={};const add=()=>{const key=positionKey(copy);seen[key]=(seen[key]||0)+1;};add();for(let i=h.length-1;i>=0;i--){if(h[i].captured)break;const p=copy.pieces.find(p=>p.id===h[i].id);if(!p)break;p.x=h[i].from.x;p.y=h[i].from.y;copy.turn=h[i].side;add();}g.seen=seen;}
+export function decideOmniscient(o:Observation,options:SearchOptions={}):Decision{
+ const started=performance.now(),side=o.side,foe=other(side),b=inferIdentities(o,false),g=worldGame(o,b,b.worlds[0]);if(o.repetition)g.seen={...o.repetition};else restoreClassicRepetition(g,o.history);
+ const legal=allActions(g),complex=legal.some(a=>a.kind==='execute'||g.pieces.some(p=>p.side===foe&&p.x===a.x&&p.y===a.y))||!!g.ritual&&Object.values(g.ritual).some(r=>r.phase==='open'||r.phase==='occupied');
+ const maxMillis=Math.min(5000,options.maxMillis??(complex?4200:1900)),budget=options.nodeBudget??110000,deadline=started+maxMillis;
+ let nodes=0,policyNodes=0,depthDone=0,tableHits=0;const expired=()=>nodes+policyNodes>=budget||performance.now()>=deadline;
+ const result=(action:Action|null):Decision=>({action,nodes:nodes+policyNodes,samples:1,elapsed:performance.now()-started,algorithm:'asymmetric informed expectimax + public opponent policy + iterative TT search',diagnostics:{depth:depthDone,rounds:tableHits,worlds:1,entropy:0,style:0,inferenceStates:policyNodes}});
+ if(o.ended||g.turn!==side||!legal.length)return result(null);
+ const step=(s:Game,a:Action)=>{nodes++;return act(s,a);};
+ const evaluate=(s:Game,ply=0)=>{if(s.result)return s.result.winner===null?0:s.result.winner===side?1000000-ply*100:-1800000+ply*100;let v=evaluateStrategy(s,side);
+  const mobility=(who:Side)=>{const k=s.pieces.find(p=>p.side===who&&p.role==='king');if(!k)return 0;const enemies=attacks(s,other(who));return [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>{const x=k.x+dx,y=k.y+dy;return x>=0&&x<7&&y>=0&&y<7&&!s.pieces.some(p=>p.side===who&&p.x===x&&p.y===y)&&!enemies.has(`${x}/${y}`);}).length;};
+  v+=(mobility(side)-mobility(foe))*150;
+  // A hidden crown is still a crown. Do not use it as the nearest hunter:
+  // spending its escape squares to chase a target caused avoidable encirclement.
+  const king=s.pieces.find(p=>p.side===side&&p.role==='king');
+  if(king){const ring=s.pieces.filter(p=>p.side===foe&&Math.abs(p.x-king.x)+Math.abs(p.y-king.y)<=2).length;v-=ring*145+Math.max(0,ring-1)*180;}
+  for(const p of s.pieces.filter(p=>p.side===side&&p.role==='guard')){const exposed=s.pieces.filter(q=>q.side===foe&&Math.abs(q.x-p.x)+Math.abs(q.y-p.y)<=2).length;if(p.charging&&exposed)v-=100+exposed*65;}
+
+  const target=s.pieces.find(p=>p.side===foe&&p.role==='king');let our=s.pieces.filter(p=>p.side===side&&p.role!=='king');if(!our.length)our=s.pieces.filter(p=>p.side===side);if(target){const distances=our.map(p=>Math.abs(p.x-target.x)+Math.abs(p.y-target.y));v+=Math.max(0,10-Math.min(...distances))*22+distances.filter(d=>d<=2).length*35;}
+  const guards=s.pieces.filter(p=>p.side===foe&&p.role==='guard');if(our.length&&guards.length){const distances=guards.map(t=>Math.min(...our.map(p=>Math.abs(p.x-t.x)+Math.abs(p.y-t.y))));v+=distances.reduce((n,d)=>n+Math.max(0,7-d)*(guards.length===1?65:15),0);}
+  return Math.max(-60000,Math.min(60000,v));};
+ type Root={a:Action;next:Game;score:number;risk:boolean;checked:boolean;h:PublicAction[]};
+ const roots:Root[]=legal.map(a=>{const n=step(g,a);return{a,next:n,h:append(g,a,n,o.history),score:evaluate(n,1)-habitCost(o,a),checked:!!n.result,risk:n.result?.winner===foe};});
+ for(const r of roots)if(r.next.result?.winner===side)return result(r.a);
+ // Exact immediate threats and rite certificates are safety analysis, not a
+ // claim that the human's move selector has access to hidden AI identities.
+ for(const r of roots){if(expired())break;if(r.next.result)continue;const replies=allActions(r.next);let allWin=replies.length>0;
+  for(const a of replies){if(expired()){allWin=false;break;}const n=step(r.next,a);if(n.result?.winner===foe)r.risk=true;if(n.result?.winner!==side)allWin=false;}
+  r.checked=!expired();if(allWin)return result(r.a);
+  if(!r.risk&&!expired()){const proof=forcedRiteLoss(r.next,side,expired);policyNodes+=proof.checks;if(proof.complete&&proof.loss)r.risk=true;}
+ }
+ const safe=roots.filter(r=>r.checked&&!r.risk);const pool=safe.length?safe:roots.some(r=>!r.risk)?roots.filter(r=>!r.risk):roots;
+ pool.sort((a,b)=>b.score-a.score);let best=pool[0].a;options.onFallback?.(result(best));
+ const tt=new Map<string,{depth:number;value:number}>(),policies=new Map<string,OpponentChoice[]>(),killers=new Map<number,string>();
+ const stateKey=(s:Game,h:PublicAction[])=>positionKey(s)+'/'+s.quiet+'/'+hash(JSON.stringify(h.slice(-12)))+'/'+hash(JSON.stringify(s.seen));
+ const tree=(s:Game,h:PublicAction[],depth:number,ply:number):number=>{
+  if(s.result||expired())return evaluate(s,ply);
+  if(depth<=0){
+   // A one-ply tactical extension sees captures and already-ready executions;
+   // no extra real action is granted and forced losing captures remain optional.
+   if(ply<10&&s.turn===side){let v=evaluate(s,ply);for(const a of allActions(s).filter(a=>a.kind==='execute'||s.pieces.some(p=>p.side!==s.turn&&p.x===a.x&&p.y===a.y))){if(expired())break;const n=step(s,a);v=Math.max(v,evaluate(n,ply+1));}return v;}
+   return evaluate(s,ply);
+  }
+  const key=stateKey(s,h),cached=tt.get(key);if(cached&&cached.depth>=depth){tableHits++;return cached.value;}
+  let v:number;
+  if(s.turn===side){
+   const danger=attacks(s,foe),guards=s.pieces.filter(p=>p.side===side&&p.role==='guard').length;
+   const moves=allActions(s).map(a=>{const p=s.pieces.find(p=>p.id===a.id)!,forcing=a.kind==='execute'||s.pieces.some(p=>p.side===foe&&p.x===a.x&&p.y===a.y)||(p.role==='king'||p.role==='guard'&&guards===1)&&danger.has(`${p.x}/${p.y}`)||a.kind==='charge'&&!!s.ritual&&Object.values(s.ritual).some(r=>r.phase!=='dormant');return{a,forcing,order:actionOrder(s,a)+(killers.get(depth)===actionKey(a)?900:0)};}).sort((a,b)=>b.order-a.order);
+   v=-Infinity;for(let i=0;i<moves.length;i++){if(expired())break;const {a,forcing}=moves[i],n=step(s,a),nh=append(s,a,n,h);let candidate=tree(n,nh,depth-1-(depth>=3&&i>=8&&!forcing?1:0),ply+1);
+    if(depth>=3&&i>=8&&!forcing&&candidate>v&&!expired())candidate=tree(n,nh,depth-1,ply+1);
+    if(candidate>v){v=candidate;killers.set(depth,actionKey(a));}
+   }if(!Number.isFinite(v))v=evaluate(s,ply);
+  }else{
+   const publicView=observe(s,foe,h),policyKey=JSON.stringify(publicView);let policy=policies.get(policyKey);
+   if(!policy){policy=opponentPolicy(publicView,expired,()=>policyNodes++);if(policies.size<3500)policies.set(policyKey,policy);}
+   v=0;for(let i=0;i<policy.length;i++){if(expired())break;const p=policy[i],n=step(s,p.action);const score=i<5||p.forcing?tree(n,append(s,p.action,n,h),depth-1,ply+1):evaluate(n,ply+1);v+=p.probability*score;}
+  }
+  if(!expired()&&tt.size<25000)tt.set(key,{depth,value:v});return v;
+ };
+ for(let depth=1;depth<=8&&!expired();depth++){
+  const scored:Root[]=[];
+  for(const r of pool){if(expired())break;const score=tree(r.next,r.h,depth-1,1)-habitCost(o,r.a);scored.push({...r,score});}
+  if(expired()||scored.length!==pool.length)break;
+  scored.sort((a,b)=>b.score-a.score);best=scored[0].a;depthDone=depth;pool.splice(0,pool.length,...scored);
+  if(scored[0].score>900000)break;
+ }
+ return result(best);
+}

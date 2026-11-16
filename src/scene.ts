@@ -1,9 +1,12 @@
 import * as T from 'three';
+import {QUALITY,type Quality} from './quality';
+import {surface,disposeSurfaces} from './surfaces';
 import {BattleEffects} from './battle-effects';
 import {battleCues,impactAt,pathProgress,type BattleCue} from './battle-timeline';
 import type { Side, VisiblePiece, VisibleRole } from './game';
 import {type GameMode,type Rites,type ActionStep} from './ritual';
 import { createCharacter, disposeCharacters, type CharacterRig } from './models';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { bodyPickMesh, cellToWorld, clientToNDC, intersectBoard,resolvePick } from './interaction';
 
@@ -26,9 +29,11 @@ function ring(parent: T.Object3D, r: number, y: number, color = GOLD, opacity = 
   const m = mesh(new T.RingGeometry(r, r + .012, 72), new T.MeshBasicMaterial({ color, transparent: true, opacity, side: T.DoubleSide }), 0, y, 0, parent);
   m.rotation.x = -Math.PI / 2; return m;
 }
-function makeActor(p: VisiblePiece): Actor {
-  const group=new T.Group(),{model,pick,rig}=createCharacter(p.role,p.side);
+function makeActor(p: VisiblePiece,quality:Quality): Actor {
+  const group=new T.Group(),{model,pick,rig}=createCharacter(p.role,p.side,quality);
   group.add(model,pick);
+  const shadow=mesh(new T.CircleGeometry(.345,24),new T.MeshBasicMaterial({color:0x05090c,transparent:true,opacity:.32,depthWrite:false}),0,.003,0,group);shadow.rotation.x=-Math.PI/2;
+  const contact=mesh(new T.RingGeometry(.345,.39,24),new T.MeshBasicMaterial({color:0x080d10,transparent:true,opacity:.13,depthWrite:false}),0,.002,0,group);contact.rotation.x=-Math.PI/2;
   const rune=ring(group,.37,.025,p.role==='martyr'?0xb394ce:p.side==='red'?RED:BLUE,.35);
   group.position.copy(cellToWorld(p.x,p.y,.18));
   const parts=[model,...Object.values(rig??{})],poses=parts.map(part=>({part,position:part.position.clone(),rotation:part.rotation.clone(),scale:part.scale.clone()}));
@@ -40,6 +45,7 @@ function makeActor(p: VisiblePiece): Actor {
 
 export class BoardScene {
   renderer: T.WebGLRenderer;
+  quality:Quality='medium';private pendingQuality:Quality|null=null;private keyLight!:T.DirectionalLight;private labelMaterial?:T.MeshBasicMaterial;
   environment: T.WebGLRenderTarget;
   scene = new T.Scene();
   camera = new T.PerspectiveCamera(36, 1, .1, 100);
@@ -52,6 +58,7 @@ export class BoardScene {
   pointer = new T.Vector2();
   state: SceneState = { pieces: [], selected: null, legal: [], viewer: 'red', cinematic: true, reduced: false, deployment: false, active: false };
   frame = 0;
+  renderedFrames = 0;
   fx:BattleEffects;
   onBattleCue:((kind:string)=>void)|null=null;
   debugActionProgress:number|null=null;
@@ -75,27 +82,28 @@ export class BoardScene {
   constructor(public host: HTMLElement, onCell: (x: number, y: number) => void) {
     this.onCell = onCell;
     this.renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
-    this.renderer.outputColorSpace = T.SRGBColorSpace; this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.3;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[this.quality].pixelRatio));
+    this.renderer.shadowMap.enabled = false; this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = T.SRGBColorSpace; this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.08;
     this.renderer.domElement.setAttribute('aria-label', '可交互的三维魔法棋盘，点击己方棋子，再点击亮起的合法格子');
     this.renderer.domElement.setAttribute('role', 'img');
     host.appendChild(this.renderer.domElement);
     const pmrem=new T.PMREMGenerator(this.renderer),room=new RoomEnvironment();
-    this.environment=pmrem.fromScene(room,.04);this.scene.environment=this.environment.texture;this.scene.environmentIntensity=.65;
+    this.environment=pmrem.fromScene(room,.04,.1,100,{size:128});this.scene.environment=this.environment.texture;this.scene.environmentIntensity=.8;
     room.dispose();pmrem.dispose();
-    this.scene.fog = new T.FogExp2(0x0c1215, .032);
+    this.scene.fog = new T.FogExp2(0x0b1319, .024);
     this.scene.add(this.root); this.root.add(this.marks);this.fx=new BattleEffects(this.root);
-    this.scene.add(new T.AmbientLight(0x9aabb4, 1.35));
-    const key = new T.DirectionalLight(0xffe0b7, 2.8); key.position.set(-4, 12, 7); key.castShadow = true;
+    this.scene.add(new T.AmbientLight(0xa6bdca, .92));
+    const key = new T.DirectionalLight(0xffe3be, 3.1); key.position.set(-4, 12, 7); key.castShadow = true;this.keyLight=key;
     key.shadow.mapSize.set(1024, 1024); key.shadow.camera.left = -7; key.shadow.camera.right = 7; key.shadow.camera.top = 7; key.shadow.camera.bottom = -7; key.shadow.normalBias = .035; this.scene.add(key);
-    const cold = new T.DirectionalLight(0x77b4d0, 2.2); cold.position.set(5, 5, -7); this.scene.add(cold);
-    const rim = new T.PointLight(0x9974ab, 9, 18); rim.position.set(-6, 3, -4); this.scene.add(rim);
+    const cold = new T.DirectionalLight(0x7cc0e3, 2.4); cold.position.set(5, 5, -7); this.scene.add(cold);
+    const rim = new T.PointLight(0xa3bed2, 8, 18); rim.position.set(-6, 3, -4); this.scene.add(rim);
     this.makeBoard(); this.makeHall();
-    const positions = new Float32Array(160 * 3);
-    for (let i = 0; i < 160; i++) { positions[i * 3] = (Math.random() - .5) * 22; positions[i * 3 + 1] = Math.random() * 7; positions[i * 3 + 2] = (Math.random() - .5) * 18; }
+    const positions = new Float32Array(100 * 3);
+    for (let i = 0; i < 100; i++) { positions[i * 3] = (Math.random() - .5) * 22; positions[i * 3 + 1] = Math.random() * 7; positions[i * 3 + 2] = (Math.random() - .5) * 18; }
     const pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(positions, 3));
-    this.particles = new T.Points(pg, new T.PointsMaterial({ color: 0xd5b782, size: .022, transparent: true, opacity: .6, depthWrite: false, blending: T.AdditiveBlending })); this.scene.add(this.particles);
+    pg.setDrawRange(0,QUALITY[this.quality].particles);
+    this.particles = new T.Points(pg, new T.PointsMaterial({ color: 0xd5b782, size: .018, transparent: true, opacity: .38, depthWrite: false, blending: T.AdditiveBlending })); this.scene.add(this.particles);
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(host); this.resize();
     this.renderer.domElement.addEventListener('pointerdown', this.pointerDown);
     this.renderer.domElement.addEventListener('pointerup', this.pointerUp);
@@ -105,68 +113,62 @@ export class BoardScene {
     this.renderer.domElement.addEventListener('lostpointercapture', this.pointerCancel);
     this.animate();
   }
-  private stoneTexture() {
-    const c = document.createElement('canvas'); c.width = c.height = 128; const ctx = c.getContext('2d')!;
-    let seed = 101;
-    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    ctx.fillStyle = '#bab7a9'; ctx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 7000; i++) { const v = 100 + Math.floor(rand() * 100); ctx.fillStyle = `rgba(${v},${v},${v},.15)`; ctx.fillRect(rand() * 128, rand() * 128, rand() * 3, rand() * 2); }
-    for (let i = 0; i < 7; i++) { ctx.strokeStyle = 'rgba(34,40,37,.12)'; ctx.lineWidth = rand() * 1.5; ctx.beginPath(); const x = rand() * 128; ctx.moveTo(x, 0); ctx.bezierCurveTo(x + 30, 40, x - 25, 75, x + 10, 128); ctx.stroke(); }
-    const tx = new T.CanvasTexture(c); tx.colorSpace = T.SRGBColorSpace; return tx;
-  }
   private makeBoard() {
-    const texture = this.stoneTexture();
-    const stone = mat(0x313d3d, .25, .8); stone.map = texture; stone.bumpMap=texture; stone.bumpScale=.024;
-    const pale = mat(0x88908a, .25, .75); pale.map = texture; pale.bumpMap=texture; pale.bumpScale=.018;
-    mesh(new T.BoxGeometry(8.1, .35, 8.1), mat(0x242e2f, .5, .6), 0, -.2, 0, this.root);
-    mesh(new T.BoxGeometry(7.8, .16, 7.8), darkMetal, 0, .005, 0, this.root);
-    for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
-      const tile = mesh(new T.BoxGeometry(.98, .15, .98), (x + y) % 2 ? stone : pale, x - 3, .065, y - 3, this.root);
-      tile.userData = { x, y }; this.tiles.push(tile);
-    }
+    const board=new T.Group();this.root.add(board);
+    const texture = surface('stone',true),relief=surface('stone');
+    const stone = mat(0x283b43, .05, .88); stone.map = texture; stone.bumpMap=relief;stone.roughnessMap=relief; stone.bumpScale=.012;
+    const pale = mat(0xa9a28f, .03, .86); pale.map = texture; pale.bumpMap=relief;pale.roughnessMap=relief; pale.bumpScale=.01;
+    mesh(new T.BoxGeometry(8.1, .35, 8.1), mat(0x242e2f, .5, .6), 0, -.2, 0, board);
+    mesh(new T.BoxGeometry(7.8, .16, 7.8), darkMetal, 0, .005, 0, board);
+    for(const parity of [0,1]){const cells=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7)})).filter(p=>(p.x+p.y)%2===parity),tiles=new T.InstancedMesh(new T.BoxGeometry(.98,.15,.98),parity?stone:pale,cells.length),matrix=new T.Matrix4();cells.forEach((p,i)=>tiles.setMatrixAt(i,matrix.makeTranslation(p.x-3,.065,p.y-3)));tiles.receiveShadow=true;board.add(tiles);this.tiles.push(tiles);}
     for (const s of [-1, 1]) {
-      mesh(new T.BoxGeometry(8.05, .065, .035), metal, 0, .1, s * 3.98, this.root);
-      mesh(new T.BoxGeometry(.035, .065, 8.05), metal, s * 3.98, .1, 0, this.root);
-      mesh(new T.BoxGeometry(7.3, .025, .025), metal, 0, .15, s * 3.63, this.root);
-      mesh(new T.BoxGeometry(.025, .025, 7.3), metal, s * 3.63, .15, 0, this.root);
+      mesh(new T.BoxGeometry(8.05, .065, .035), metal, 0, .1, s * 3.98, board);
+      mesh(new T.BoxGeometry(.035, .065, 8.05), metal, s * 3.98, .1, 0, board);
+      mesh(new T.BoxGeometry(7.3, .025, .025), metal, 0, .15, s * 3.63, board);
+      mesh(new T.BoxGeometry(.025, .025, 7.3), metal, s * 3.63, .15, 0, board);
       for (let i = 0; i < 7; i++) {
-        this.label('ABCDEFG'[i], i - 3, .16, s * 3.8, s === 1 ? 0 : Math.PI);
-        this.label(String(7 - i), s * 3.8, .16, i - 3, s === 1 ? -Math.PI / 2 : Math.PI / 2);
+        this.label('ABCDEFG'[i], i - 3, .16, s * 3.8, s === 1 ? 0 : Math.PI,board);
+        this.label(String(7 - i), s * 3.8, .16, i - 3, s === 1 ? -Math.PI / 2 : Math.PI / 2,board);
       }
       for (const t of [-1, 1]) {
-        const corner = new T.Group(); corner.position.set(s * 3.78, .16, t * 3.78); this.root.add(corner);
+        const corner = new T.Group(); corner.position.set(s * 3.78, .16, t * 3.78); board.add(corner);
         ring(corner, .12, 0, GOLD, .85); ring(corner, .16, 0, GOLD, .6);
         mesh(new T.OctahedronGeometry(.07), metal, 0, .03, 0, corner).scale.y = .3;
       }
     }
     for (let i = 0; i < 4; i++) {
       const a = Math.PI / 4 + i * Math.PI / 2;
-      const foot = mesh(new T.BoxGeometry(.7, .4, .7), darkMetal, Math.sin(a) * 4.7, -.5, Math.cos(a) * 4.7, this.root); foot.rotation.y = Math.PI / 4;
+      const foot = mesh(new T.BoxGeometry(.7, .4, .7), darkMetal, Math.sin(a) * 4.7, -.5, Math.cos(a) * 4.7, board); foot.rotation.y = Math.PI / 4;
     }
+    this.batchStatic(board);
   }
-  private label(text: string, x: number, y: number, z: number, rotation: number) {
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    const ctx = c.getContext('2d')!; ctx.font = '30px Georgia'; ctx.fillStyle = '#c5ad7a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 32, 32);
-    const m = mesh(new T.PlaneGeometry(.22, .22), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c), transparent: true, opacity: .7, depthWrite: false }), x, y, z, this.root);
-    m.rotation.set(-Math.PI / 2, 0, rotation);
+  private label(text:string,x:number,y:number,z:number,rotation:number,parent:T.Group){
+    const glyphs='ABCDEFG7654321';
+    if(!this.labelMaterial){const c=document.createElement('canvas');c.width=64*glyphs.length;c.height=64;const ctx=c.getContext('2d')!;ctx.font='30px Georgia';ctx.fillStyle='#d7bc82';ctx.textAlign='center';ctx.textBaseline='middle';for(let i=0;i<glyphs.length;i++)ctx.fillText(glyphs[i],i*64+32,32);this.labelMaterial=new T.MeshBasicMaterial({map:new T.CanvasTexture(c),transparent:true,opacity:.85,depthWrite:false});}
+    const geo=new T.PlaneGeometry(.22,.22),uv=geo.getAttribute('uv'),index=glyphs.indexOf(text);for(let i=0;i<uv.count;i++)uv.setX(i,(uv.getX(i)+index)/glyphs.length);
+    const m=mesh(geo,this.labelMaterial,x,y,z,parent);m.rotation.set(-Math.PI/2,0,rotation);
+  }
+  private batchStatic(group:T.Group){
+    group.updateMatrixWorld(true);const groups=new Map<T.Material,T.Mesh[]>();group.traverse(o=>{if(o instanceof T.Mesh&&!(o instanceof T.InstancedMesh)&&!Array.isArray(o.material)){const list=groups.get(o.material)??[];list.push(o);groups.set(o.material,list);}});
+    for(const[material,objects]of groups){if(objects.length<2)continue;const inverse=group.matrixWorld.clone().invert(),geometries=objects.map(o=>{const raw=o.geometry.clone(),g=raw.index?raw.toNonIndexed():raw;if(g!==raw)raw.dispose();return g.applyMatrix4(new T.Matrix4().multiplyMatrices(inverse,o.matrixWorld));});const merged=mergeGeometries(geometries);geometries.forEach(g=>g.dispose());if(!merged)continue;for(const o of objects){o.removeFromParent();o.geometry.dispose();}mesh(merged,material,0,0,0,group);}
   }
   private makeHall() {
-    const stone = mat(0x162023, .15, .9);
-    const floor = mesh(new T.PlaneGeometry(150, 150), new T.MeshBasicMaterial({color:0x0c1215,toneMapped:false}), 0, -.78, 0, this.scene); floor.rotation.x = -Math.PI / 2;
+    const stone = mat(0x1d2b32, .04, .94);stone.bumpMap=surface('stone');stone.bumpScale=.035;
+    const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d')!,fade=ctx.createRadialGradient(64,64,4,64,64,64);fade.addColorStop(0,'white');fade.addColorStop(.55,'#777');fade.addColorStop(1,'black');ctx.fillStyle=fade;ctx.fillRect(0,0,128,128);
+    const floor = mesh(new T.PlaneGeometry(32,32),new T.MeshStandardMaterial({color:0x162731,roughness:.97,metalness:.02,envMapIntensity:.15,transparent:true,opacity:.3,alphaMap:new T.CanvasTexture(c),depthWrite:false}),0,-.78,0,this.scene);floor.rotation.x=-Math.PI/2;
     const ritual = new T.Group(); ritual.position.y = -.765; this.scene.add(ritual);
     [5.3, 5.45, 5.7, 6.5].forEach(r => ring(ritual, r, 0, GOLD, .14));
-    for (let i = 0; i < 32; i++) {
-      const a = i * Math.PI / 16;
-      line(ritual, [new T.Vector3(Math.sin(a) * 5.5, 0, Math.cos(a) * 5.5), new T.Vector3(Math.sin(a + .02) * 5.8, 0, Math.cos(a + .02) * 5.8), new T.Vector3(Math.sin(a + .04) * 5.5, 0, Math.cos(a + .04) * 5.5)], GOLD, .2);
-    }
+    const glyphLines:T.Vector3[]=[];for(let i=0;i<32;i++){const a=i*Math.PI/16,p=new T.Vector3(Math.sin(a)*5.5,0,Math.cos(a)*5.5),q=new T.Vector3(Math.sin(a+.02)*5.8,0,Math.cos(a+.02)*5.8),r=new T.Vector3(Math.sin(a+.04)*5.5,0,Math.cos(a+.04)*5.5);glyphLines.push(p,q,q,r);}ritual.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(glyphLines),new T.LineBasicMaterial({color:GOLD,transparent:true,opacity:.2,depthWrite:false})));
+    const columns=new T.Group();this.scene.add(columns);
     for (const x of [-9, 9]) for (const z of [-9, 0, 9]) {
-      const pillar = new T.Group(); pillar.position.set(x, -.7, z); this.scene.add(pillar);
+      const pillar = new T.Group(); pillar.position.set(x, -.7, z); columns.add(pillar);
       cylinder(pillar, .7, .85, .35, .17, stone, 8); cylinder(pillar, .45, .54, 9, 4.8, stone, 12);
       for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; mesh(new T.CylinderGeometry(.035, .035, 8.6, 6), darkMetal, Math.sin(a) * .5, 4.8, Math.cos(a) * .5, pillar); }
       cylinder(pillar, .75, .6, .3, 9.4, darkMetal, 8);
       const candle = mesh(new T.ConeGeometry(.06, .3, 8), new T.MeshBasicMaterial({ color: 0xefb46c }), x > 0 ? -.7 : .7, 2, 0, pillar);
-      const flame = new T.PointLight(0xe6a45f, 2.8, 5); flame.position.copy(candle.position); pillar.add(flame);
+      const flame = new T.PointLight(0xe6a45f, 2.8, 5); flame.position.copy(candle.position); flame.userData.decorativeLight=true;flame.visible=this.quality==='high';pillar.add(flame);
     }
+    this.batchStatic(columns);
   }
   update(next: SceneState) {
     // A staged, noninteractive court portrait; never mutate a live match.
@@ -198,7 +200,7 @@ export class BoardScene {
       if (!actor || actor.role !== p.role) {
         const unseal=next.mode==='ritual'&&p.revealed&&p.role==='king'&&actor?.role==='unknown';
         if (actor) { this.removeActor(p.id,actor); }
-        actor = makeActor(p);if(unseal)actor.revealStarted=performance.now();this.root.add(actor.group); this.actors.set(p.id, actor);
+        actor = makeActor(p,this.quality);if(unseal)actor.revealStarted=performance.now();this.root.add(actor.group); this.actors.set(p.id, actor);
       }
       if(next.mode!=='ritual'||next.deployment)actor.revealStarted=undefined;
       const target = new T.Vector3(p.x - 3, .18, p.y - 3);
@@ -222,11 +224,29 @@ export class BoardScene {
       const g = new T.Group(); g.position.set(t.x - 3, .16, t.y - 3); this.marks.add(g);
       const tint = mesh(new T.PlaneGeometry(.9,.9),new T.MeshBasicMaterial({color:occupied?0xe8a175:0xd8c68c,transparent:true,opacity:.18,depthWrite:false}),0,.002,0,g); tint.rotation.x=-Math.PI/2;
       ring(g, occupied ? .42 : .25, .005, occupied ? 0xea956b : 0xdbc58b, .95);
+      if(occupied){for(const sign of [-1,1])line(g,[new T.Vector3(-.12,.016,sign*.12),new T.Vector3(.12,.016,-sign*.12)],0xffb095,.95);}
       if (!occupied) { const dot = mesh(new T.CircleGeometry(.06, 20), new T.MeshBasicMaterial({ color: 0xf0d49a, transparent: true, opacity: .85 }), 0, .005, 0, g); dot.rotation.x = -Math.PI / 2; }
     }
     this.fx.update(next.mode,next.ritual,next.pieces,next.preview,next.pendingCharge,next.pieces.find(p=>p.id===next.selected));
-    if(next.viewer!==previousViewer){this.renderer.render(this.scene,this.camera);this.lastRender=performance.now();}
+    if(next.viewer!==previousViewer){this.renderer.render(this.scene,this.camera);this.renderedFrames++;this.lastRender=performance.now();}
 
+  }
+  setQuality(value:Quality){
+    if(value===this.quality&&!this.pendingQuality)return;
+    // Defer mesh replacement until the active animation has settled. Changing
+    // settings must never cancel a move or release an actor still in use.
+    this.pendingQuality=value;this.applyQuality();
+  }
+  private applyQuality(){
+    if(!this.pendingQuality||this.transition)return;
+    this.quality=this.pendingQuality;this.pendingQuality=null;const q=QUALITY[this.quality];
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
+    this.renderer.shadowMap.enabled=!!q.shadow;
+    if(q.shadow){this.keyLight.shadow.mapSize.set(q.shadow,q.shadow);this.keyLight.shadow.map?.dispose();this.keyLight.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}
+    this.scene.traverse(o=>{if(o.userData.decorativeLight)o.visible=this.quality==='high';});
+    this.particles.geometry.setDrawRange(0,q.particles);
+    for(const[id,actor]of this.actors)this.removeActor(id,actor);
+    this.update(this.state);this.renderer.setSize(this.host.clientWidth,this.host.clientHeight);this.dirty=true;
   }
   resetActors() {
     this.cancelMove();
@@ -236,7 +256,7 @@ export class BoardScene {
   }
   revealActor(id:string,role:VisibleRole){
     const old=this.actors.get(id);if(!old||old.role===role)return;
-    const next=makeActor({id,role,side:old.side,x:old.group.userData.x,y:old.group.userData.y});next.group.position.copy(old.group.position);next.target.copy(old.target);
+    const next=makeActor({id,role,side:old.side,x:old.group.userData.x,y:old.group.userData.y},this.quality);next.group.position.copy(old.group.position);next.target.copy(old.target);
     this.removeActor(id,old);this.actors.set(id,next);this.root.add(next.group);
   }
   animateMove(id:string, role:VisibleRole, to:{x:number;y:number}, victimId?:string, reduced=false):Promise<boolean> {
@@ -365,6 +385,7 @@ export class BoardScene {
   private animate = () => {
     if (this.dead) return;
     this.frame = requestAnimationFrame(this.animate);
+    this.applyQuality();
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, .05); this.last = now;
     // Full privacy/result covers have no interactive 3D content. Stop their
     // hidden GPU work so DOM/SVG ending animation can use the compositor freely.
@@ -421,7 +442,7 @@ export class BoardScene {
     if(this.renderer.domElement.dataset.ready!==ready)this.renderer.domElement.dataset.ready=ready;
     const moving=!!this.transition||!!this.burst||this.fx.transients.length>0||ready==='false';
     if (!document.hidden&&(this.dirty||moving||(!this.state.reduced&&now-this.lastRender>33))){
-      this.renderer.render(this.scene,this.camera);this.lastRender=now;this.dirty=false;
+      this.renderer.render(this.scene,this.camera);this.renderedFrames++;this.lastRender=now;this.dirty=false;
     }
   };
   skipMove(){if(!this.transition)return;this.transition.silent=true;this.stepMove(this.transition.start+this.transition.duration+1);}
@@ -438,6 +459,6 @@ export class BoardScene {
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown); this.renderer.domElement.removeEventListener('pointerup', this.pointerUp); this.renderer.domElement.removeEventListener('pointermove', this.pointerMove); this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.removeEventListener('lostpointercapture', this.pointerCancel);
-    this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose(); this.renderer.dispose(); this.renderer.domElement.remove();
+    this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();
   }
 }

@@ -3,7 +3,7 @@ const{launch,openGame,root}=require('./support.cjs'),assert=require('node:assert
  const game=await openGame(browser,'dist',{deviceScaleFactor:.75},false);page=game.page;report.errors=game.errors;
  assert.equal(await page.evaluate(()=>typeof window.__SK_QA__),'undefined');assert.equal(await page.locator('.fallback-board').count(),0);
  for(const name of ['棋侍','影谋','诡相','无冕者']){
-  await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();await page.getByRole('button',{name:new RegExp(name)}).click();await page.getByRole('button',{name:'确认布阵'}).click();
+  await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();await page.getByRole('button',{name:new RegExp(name)}).click();await page.getByRole('button',{name:'开始布阵',exact:true}).click();await page.getByRole('button',{name:'确认布阵'}).click();
   await page.locator('.sr-board button').nth(6*7).focus();await page.keyboard.press('Enter');await page.locator('.sr-board button').nth(5*7).focus();await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.querySelector('.round-counter small')?.textContent==='2 步已落定'&&!document.querySelector('.player-status')?.textContent.includes('思考'),null,{timeout:60000});
   assert.match(await page.locator('.sr-board button').nth(5*7).getAttribute('aria-label'),/绯红王庭 影卫/);assert.equal(await page.locator('.handoff-screen').count(),0);

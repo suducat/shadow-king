@@ -13,8 +13,8 @@ async function ready(){await page.waitForFunction(()=>{const s=(window as any)._
 try{
  const game=await openGame(browser,'dist-test',{deviceScaleFactor:.5});page=game.page;report.errors=game.errors;
  await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();
- assert.equal(await page.locator('.difficulty-card').count(),4);await page.screenshot({path:path.join(root,'artifacts/v03-difficulty.png')});
- await page.getByRole('button',{name:/无冕者/}).click();await page.getByRole('button',{name:'确认布阵'}).click();await ready();
+ assert.equal(await page.locator('.difficulty-card').count(),5);await page.screenshot({path:path.join(root,'artifacts/v03-difficulty.png')});
+ await page.getByRole('button',{name:/无冕者/}).click();await page.getByRole('button',{name:'开始布阵',exact:true}).click();await page.getByRole('button',{name:'确认布阵'}).click();await ready();
  let s=await snapshot();assert.equal(s.gameMode,'ai');assert.equal(s.viewer,'red');assert.equal(s.game.turn,'red');
  await click(3,6,.7);await click(3,5); // regular human crown move
  // While AI owns the turn, attempted human moves cannot control either army.
@@ -30,7 +30,7 @@ try{
   else{await page.getByRole('button',{name:'暗王主菜单',exact:true}).click();await page.getByRole('button',{name:'返回主菜单',exact:true}).last().click();}
   await page.getByRole('button',{name:/开启棋局/}).click();await page.getByRole('button',{name:/人机对战/}).click();
   const name={easy:'棋侍',normal:'影谋',hard:'诡相',master:'无冕者'}[level]!;
-  await page.getByRole('button',{name:new RegExp(name)}).click();await page.getByRole('button',{name:'确认布阵'}).click();await ready();
+  await page.getByRole('button',{name:new RegExp(name)}).click();await page.getByRole('button',{name:'开始布阵',exact:true}).click();await page.getByRole('button',{name:'确认布阵'}).click();await ready();
   for(let turns=0;turns<130;turns++){
    await page.waitForFunction(()=>{const s=(window as any).__SK_QA__.snapshot();return s.phase==='result'||s.reveal||s.game.turn==='red'&&!s.busy;},null,{timeout:30000});
    s=await snapshot();if(s.reveal){await page.getByRole('button',{name:'继续',exact:true}).click();continue;}if(s.phase==='result')break;

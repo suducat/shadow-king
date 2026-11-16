@@ -1,6 +1,6 @@
-# 暗王 · SHADOW KING — V0.5.1
+# 暗王 · SHADOW KING — V0.6.0
 
-双人奇幻隐藏身份策略棋，使用 React、TypeScript、Three.js、Vite 与 Web Audio。完整游戏在浏览器本地运行，支持本地双人、四档 AI、经典模式和祭典模式。
+双人奇幻隐藏身份策略棋，使用 React、TypeScript、Three.js、Vite 与 Web Audio。完整游戏在浏览器本地运行，支持本地双人、四档公平 AI、全知者透视挑战、经典模式和祭典模式。
 
 此仓库是正式游戏发行版，已整合复盘后的风险评估、完整祭典回应验证与合法格点击修复。无需后端、数据库、模型 API 或访问令牌。
 
@@ -32,7 +32,18 @@ npm run preview
 - 祭典模式：己方三死士全灭开启祭典，王永久公开；王占领中心3×3祭台并守过敌方回应后获胜。
 - 祭典影卫需提前一回合公开蓄力，每枚整局一次斩杀，固定向前尽量移动两格；仅边界可缩短，友军阻挡时不能释放。
 
-本地双人使用隐私交接；人机对战由玩家执红，AI执蓝。四档难度为棋侍、影谋、诡相、无冕者。AI只接收自身身份与公开对局信息，在本地 Worker 内计算。
+本地双人使用隐私交接；人机对战由玩家执红，AI执蓝。四档公平难度为棋侍、影谋、诡相、无冕者，只接收自身身份与公开对局信息。第五档「全知者 · 帷幕之外」是玩家主动选择的透视挑战：它能够看见玩家全部真实身份，玩家仍看不见 AI 未公开身份。选择页有醒目告知和独立开始按钮，对局顶部持续标示。全部搜索在本地 Worker 中进行，不需要联网。
+
+## V0.6.0 改进
+
+- 全知权限由观察边界显式授予，Worker 重新验证；不修改棋子的公开状态。原四档会丢弃误传的透视权限。
+- 独立的非对称搜索：完整身份战术、全合法根行动安全检查、祭典反制证明、迭代加深、有限置换缓存、走法排序与战术延伸。模拟玩家的行动概率仅由玩家公开信息生成。
+- 通常搜索预算 1.9 秒，存在吃子、斩杀或开启祭典时 4.2 秒，硬上限 5 秒。380ms 最短选子展示与200ms选中反馈另计，复杂搜索不额外人为等待。5.6 秒看门狗优先使用 Worker 已发回的合法战术回退。
+- 黑曜石、石灰岩、旧金、铠甲、织物采用不同粗糙度与原创程序纹理；暖主光与冷轮廓光提高正常视角识别度。
+- 设置中提供高／中／低画质；默认桌面中档、触控或低核心设备低档，尊重系统减少动态效果。低档保留全部关键状态提示。
+- 棋盘实例化、字符图集和环境合批降低绘制开销；画质变更在战斗完成后替换角色资源，保留原模型、动作与身份伪装。
+
+实测数据、限制、画质说明与前后截图见 [V0.6 验证报告](docs/v0.6/REPORT.md)。此挑战以高获胜能力为目标，不声称不可战胜。
 
 ## V0.5.1 改进
 
@@ -50,6 +61,9 @@ npx tsx scripts/ai-v05-tactics.ts
 npm run build:test
 npx playwright install chromium
 node tests/ai-controller.cjs
+npm run test:omniscient
+npm run test:v06:browser
+node tests/v06-render.cjs
 npm run build
 node tests/ritual-production.cjs
 node tests/production.cjs
@@ -59,10 +73,19 @@ node tests/production.cjs
 
 源码包括规则、交互、模型生命周期、动画及AI回归检查。算法是有预算的身份采样与回应搜索，仍有长程规划和僵持限制，不代表已达到某个人类棋力等级。
 
+固定种子、真实浏览器 Worker 预算的对战工具：
+
+```sh
+npm run build:test
+TAG=experiment SEEDS=2 JOBS=2 npm run test:v06:arena
+```
+
+会运行经典／祭典、交换红蓝先后手、对当前大师／死士前压／守王基线的全部配对对局。保留所有胜负和平局，不会挑选种子。原始输出位于 `artifacts/v06/experiment/arena.json`；复现发布测试使用报告中的源版本和种子。软件显卡上请顺序运行视觉检查，避免同时开启多个 WebGL 实例。
+
 ## 结构
 
 - `src/game.ts` / `ritual.ts`：正式规则与胜负判定。
-- `src/ai.ts` / `belief.ts` / `strategic-ai.ts` / `rite-proof.ts`：观察隔离、身份概率、搜索与祭典反制验证。
+- `src/ai.ts` / `belief.ts` / `strategic-ai.ts` / `omniscient-ai.ts` / `rite-proof.ts`：观察隔离、身份概率、搜索与祭典反制验证。
 - `src/scene.ts` / `models.ts` / `battle-*`：3D场景、角色与演出。
 - `src/App.tsx` / `BoardHUD.tsx` / `RitualUI.tsx`：正式游戏界面。
 - `tests/`：规则与交互回归；其中夹具为程序化测试局面。

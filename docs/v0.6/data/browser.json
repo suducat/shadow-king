@@ -1,0 +1,43 @@
+{
+  "checks": [
+    "desktop: 五张卡、键盘选择、独立告知/启动、真实透视 Worker、仅一步、玩家暗身份不泄漏",
+    "desktop: 重开保留挑战难度，切回大师立即撤销透视和挑战标记",
+    "mobile: 五张卡、键盘选择、独立告知/启动、真实透视 Worker、仅一步、玩家暗身份不泄漏",
+    "mobile: 重开保留挑战难度，切回大师立即撤销透视和挑战标记",
+    "三种 AI 攻击者均使用封印外观/动作，实际吃王、揭示、胜利与停止计算正常",
+    "祭典模式实际 Worker 连续斩杀与途中弑王，唯一技能次数正常结算",
+    "重开/退出终止 Worker，强行送达的旧结果不能落子或重复结算"
+  ],
+  "errors": [],
+  "responsiveness": [
+    {
+      "name": "desktop",
+      "requestedTimerMs": 40,
+      "observedMs": 70.20000000018626
+    },
+    {
+      "name": "mobile",
+      "requestedTimerMs": 40,
+      "observedMs": 40.90000000037253
+    }
+  ],
+  "workers": [
+    {
+      "name": "desktop",
+      "nodes": 17720,
+      "samples": 1,
+      "algorithm": "asymmetric informed expectimax + public opponent policy + iterative TT search",
+      "elapsed": 1900,
+      "fallback": false
+    },
+    {
+      "name": "mobile",
+      "nodes": 18138,
+      "samples": 1,
+      "algorithm": "asymmetric informed expectimax + public opponent policy + iterative TT search",
+      "elapsed": 1900,
+      "fallback": false
+    }
+  ],
+  "complete": true
+}

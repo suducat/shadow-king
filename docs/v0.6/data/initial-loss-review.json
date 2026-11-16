@@ -1,0 +1,858 @@
+{
+  "version": "initial",
+  "reviews": [
+    {
+      "mode": "ritual",
+      "baseline": "master",
+      "seed": 63017,
+      "reverse": true,
+      "result": {
+        "winner": "red",
+        "reason": "king"
+      },
+      "exposedLosses": [
+        {
+          "ply": 9,
+          "action": {
+            "id": "blue-2",
+            "x": 4,
+            "y": 4,
+            "kind": "charge"
+          },
+          "counter": {
+            "id": "red-4",
+            "x": 4,
+            "y": 4
+          }
+        },
+        {
+          "ply": 39,
+          "action": {
+            "id": "blue-5",
+            "x": 4,
+            "y": 4,
+            "kind": "charge"
+          },
+          "counter": {
+            "id": "red-5",
+            "x": 4,
+            "y": 4
+          }
+        }
+      ],
+      "terminalThreats": [
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 6,
+            "y": 4
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 4,
+            "y": 4
+          },
+          "losingReplies": [
+            {
+              "id": "red-3",
+              "x": 4,
+              "y": 4
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 5
+          },
+          "losingReplies": [
+            {
+              "id": "red-3",
+              "x": 5,
+              "y": 5
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 3
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 4,
+            "kind": "charge"
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 6,
+            "y": 4,
+            "kind": "charge"
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 4,
+            "y": 4,
+            "kind": "charge"
+          },
+          "losingReplies": [
+            {
+              "id": "red-3",
+              "x": 4,
+              "y": 4
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 5,
+            "kind": "charge"
+          },
+          "losingReplies": [
+            {
+              "id": "red-3",
+              "x": 5,
+              "y": 5
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 3,
+            "kind": "charge"
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-1",
+            "x": 4,
+            "y": 1
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-1",
+            "x": 2,
+            "y": 1
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-1",
+            "x": 3,
+            "y": 0
+          },
+          "losingReplies": [
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 3,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-3",
+            "x": 4,
+            "y": 2
+          },
+          "losingReplies": [
+            {
+              "id": "red-1",
+              "x": 4,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-3",
+            "x": 2,
+            "y": 2
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 2,
+              "y": 2
+            },
+            {
+              "id": "red-0",
+              "x": 2,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-3",
+            "x": 3,
+            "y": 3
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 3,
+              "y": 3
+            },
+            {
+              "id": "red-0",
+              "x": 3,
+              "y": 3,
+              "kind": "charge"
+            }
+          ]
+        }
+      ],
+      "allFinalActionsLose": true,
+      "lastMoves": [
+        {
+          "ply": 67,
+          "action": {
+            "id": "blue-0",
+            "x": 4,
+            "y": 2,
+            "kind": "charge"
+          },
+          "captured": [],
+          "events": [
+            {
+              "kind": "charge",
+              "side": "blue",
+              "id": "blue-0",
+              "ply": 68
+            }
+          ]
+        },
+        {
+          "ply": 68,
+          "action": {
+            "id": "red-1",
+            "x": 4,
+            "y": 1
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 69,
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 2
+          },
+          "captured": [],
+          "events": [
+            {
+              "kind": "abandon",
+              "side": "blue",
+              "id": "blue-0",
+              "ply": 70
+            }
+          ]
+        },
+        {
+          "ply": 70,
+          "action": {
+            "id": "red-6",
+            "x": 5,
+            "y": 3
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 71,
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 3
+          },
+          "captured": [
+            {
+              "side": "red",
+              "role": "martyr",
+              "by": "blue",
+              "ply": 72,
+              "at": "F4",
+              "id": "red-6",
+              "execution": false,
+              "charged": false
+            }
+          ],
+          "events": []
+        },
+        {
+          "ply": 72,
+          "action": {
+            "id": "red-0",
+            "x": 2,
+            "y": 3
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 73,
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 3,
+            "kind": "charge"
+          },
+          "captured": [],
+          "events": [
+            {
+              "kind": "charge",
+              "side": "blue",
+              "id": "blue-0",
+              "ply": 74
+            }
+          ]
+        },
+        {
+          "ply": 74,
+          "action": {
+            "id": "red-3",
+            "x": 4,
+            "y": 5
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 75,
+          "action": {
+            "id": "blue-0",
+            "x": 5,
+            "y": 4
+          },
+          "captured": [],
+          "events": [
+            {
+              "kind": "abandon",
+              "side": "blue",
+              "id": "blue-0",
+              "ply": 76
+            }
+          ]
+        },
+        {
+          "ply": 76,
+          "action": {
+            "id": "red-5",
+            "x": 3,
+            "y": 3
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 77,
+          "action": {
+            "id": "blue-3",
+            "x": 4,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 78,
+          "action": {
+            "id": "red-1",
+            "x": 4,
+            "y": 2
+          },
+          "captured": [
+            {
+              "side": "blue",
+              "role": "king",
+              "by": "red",
+              "ply": 79,
+              "at": "E5",
+              "id": "blue-3",
+              "execution": false,
+              "charged": false
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "mode": "ritual",
+      "baseline": "master",
+      "seed": 70936,
+      "reverse": true,
+      "result": {
+        "winner": "red",
+        "reason": "king"
+      },
+      "exposedLosses": [
+        {
+          "ply": 31,
+          "action": {
+            "id": "blue-5",
+            "x": 2,
+            "y": 3,
+            "kind": "charge"
+          },
+          "counter": {
+            "id": "red-0",
+            "x": 2,
+            "y": 3
+          }
+        }
+      ],
+      "terminalThreats": [
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 2,
+            "y": 2
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 0,
+              "kind": "execute"
+            },
+            {
+              "id": "red-1",
+              "x": 2,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 2,
+              "y": 2
+            },
+            {
+              "id": "red-5",
+              "x": 2,
+              "y": 2,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 0,
+            "y": 2
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 0,
+              "kind": "execute"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 1,
+            "y": 3
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 0,
+              "kind": "execute"
+            },
+            {
+              "id": "red-5",
+              "x": 1,
+              "y": 3
+            },
+            {
+              "id": "red-5",
+              "x": 1,
+              "y": 3,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-0",
+            "x": 1,
+            "y": 1
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 0,
+              "kind": "execute"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-3",
+            "x": 5,
+            "y": 0
+          },
+          "losingReplies": [
+            {
+              "id": "red-2",
+              "x": 5,
+              "y": 0
+            },
+            {
+              "id": "red-2",
+              "x": 5,
+              "y": 0,
+              "kind": "charge"
+            }
+          ]
+        },
+        {
+          "action": {
+            "id": "blue-3",
+            "x": 6,
+            "y": 1
+          },
+          "losingReplies": [
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 1
+            },
+            {
+              "id": "red-0",
+              "x": 6,
+              "y": 0,
+              "kind": "execute"
+            },
+            {
+              "id": "red-2",
+              "x": 6,
+              "y": 1
+            },
+            {
+              "id": "red-2",
+              "x": 6,
+              "y": 1,
+              "kind": "charge"
+            }
+          ]
+        }
+      ],
+      "allFinalActionsLose": true,
+      "lastMoves": [
+        {
+          "ply": 113,
+          "action": {
+            "id": "blue-0",
+            "x": 0,
+            "y": 3
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 114,
+          "action": {
+            "id": "red-3",
+            "x": 2,
+            "y": 5
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 115,
+          "action": {
+            "id": "blue-0",
+            "x": 0,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 116,
+          "action": {
+            "id": "red-0",
+            "x": 5,
+            "y": 3
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 117,
+          "action": {
+            "id": "blue-0",
+            "x": 1,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 118,
+          "action": {
+            "id": "red-6",
+            "x": 4,
+            "y": 4
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 119,
+          "action": {
+            "id": "blue-0",
+            "x": 0,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 120,
+          "action": {
+            "id": "red-0",
+            "x": 5,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 121,
+          "action": {
+            "id": "blue-0",
+            "x": 1,
+            "y": 2
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 122,
+          "action": {
+            "id": "red-0",
+            "x": 6,
+            "y": 2,
+            "kind": "charge"
+          },
+          "captured": [],
+          "events": [
+            {
+              "kind": "charge",
+              "side": "red",
+              "id": "red-0",
+              "ply": 123
+            }
+          ]
+        },
+        {
+          "ply": 123,
+          "action": {
+            "id": "blue-0",
+            "x": 1,
+            "y": 1
+          },
+          "captured": [],
+          "events": []
+        },
+        {
+          "ply": 124,
+          "action": {
+            "id": "red-0",
+            "x": 6,
+            "y": 0,
+            "kind": "execute"
+          },
+          "captured": [
+            {
+              "side": "blue",
+              "role": "king",
+              "by": "red",
+              "ply": 125,
+              "at": "G7",
+              "id": "blue-3",
+              "execution": true,
+              "charged": false
+            }
+          ],
+          "events": [
+            {
+              "kind": "execute",
+              "side": "red",
+              "id": "red-0",
+              "ply": 125,
+              "kills": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
