@@ -1,0 +1,9 @@
+import {ArrowLeft,Check,Crown,Shield,Sparkles,Swords} from 'lucide-react';
+import {DIFFICULTIES,type Difficulty} from './ai';
+import type {GameMode} from './ritual';
+const portraits=[Shield,Swords,Sparkles,Crown];
+const copy:Record<Difficulty,string>={easy:'行动较直接，适合第一次熟悉移动、吃子与献祭。',normal:'兼顾进攻与防守，适合已经了解胜利条件的玩家。',hard:'会考虑后续回应与祭台争夺，适合希望多一些变化的玩家。',master:'投入更多本地计算，权衡多步行动与风险，适合愿意耐心思考的玩家。'};
+export function OpponentSelect({difficulty,rule,select,back,start}:{difficulty:Difficulty;rule:GameMode;select:(d:Difficulty)=>void;back:()=>void;start:()=>void}){
+ const keys=Object.keys(DIFFICULTIES) as Difficulty[],rank=keys.indexOf(difficulty),d=DIFFICULTIES[difficulty],Icon=portraits[rank];
+ return <div className="opponent-layout"><section className="mode-panel difficulty-panel"><button className="text-back" onClick={back}><ArrowLeft size={16}/>返回模式选择</button><div className="eyebrow">永夜王庭 · 选择对手</div><h2>与谁共谋命运</h2><p>选择一位对手，确认后开始秘密布阵。</p>{keys.map((level,i)=>{const info=DIFFICULTIES[level],Badge=portraits[i];return <button key={level} aria-pressed={difficulty===level} className="mode-card difficulty-card" onClick={()=>select(level)}><Badge size={28}/><div><strong>{info.name}<em>{info.title}</em></strong><small>{info.label} · {copy[level]}</small></div>{difficulty===level&&<Check size={18}/>}</button>})}</section><section className={`opponent-portrait rank-${rank}`} aria-live="polite"><div className="opponent-seal"><Icon size={76} strokeWidth={1}/><span>{'◇ '.repeat(rank+1)}</span></div><p className="eyebrow">王庭第 {rank+1} 席 · {d.label}</p><h2>{d.name}</h2><p>{d.title}</p><p className="opponent-description">{copy[difficulty]}</p><div className="match-summary">{rule==='classic'?'经典规则':'祭典规则'} · {d.name} · 你执红</div><button className="primary full" onClick={start}>开始布阵 <Swords size={18}/></button><small>本地运算 · 无需联网 · 不读取敌方秘密身份<br/>难度为相对档位，不代表经过评级的棋力。</small></section></div>;
+}

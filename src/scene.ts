@@ -152,7 +152,7 @@ export class BoardScene {
   }
   private makeHall() {
     const stone = mat(0x162023, .15, .9);
-    const floor = mesh(new T.PlaneGeometry(150, 150), mat(0x10181b, .35, .7), 0, -.78, 0, this.scene); floor.rotation.x = -Math.PI / 2;
+    const floor = mesh(new T.PlaneGeometry(150, 150), new T.MeshBasicMaterial({color:0x0c1215}), 0, -.78, 0, this.scene); floor.rotation.x = -Math.PI / 2;
     const ritual = new T.Group(); ritual.position.y = -.765; this.scene.add(ritual);
     [5.3, 5.45, 5.7, 6.5].forEach(r => ring(ritual, r, 0, GOLD, .14));
     for (let i = 0; i < 32; i++) {
@@ -169,6 +169,12 @@ export class BoardScene {
     }
   }
   update(next: SceneState) {
+    // A staged, noninteractive court portrait; never mutate a live match.
+    if(!next.active){
+      const king=next.pieces.find(p=>p.side==='red'&&p.role==='king');
+      const masks=next.pieces.filter(p=>p.side==='blue').slice(0,2);
+      next={...next,pieces:[...(king?[{...king,x:3,y:4}]:[]),...masks.map((p,i)=>({...p,x:i===0?2:4,y:2}))]};
+    }
     this.dirty=true;
     this.renderer.domElement.dataset.ready='false';
     const geometryChanged=next.pieces.length!==this.state.pieces.length||next.pieces.some(p=>!this.state.pieces.some(old=>old.id===p.id&&old.role===p.role&&old.x===p.x&&old.y===p.y));
@@ -366,7 +372,7 @@ export class BoardScene {
     const speed = this.state.reduced ? 1 : 1 - Math.exp(-Math.min((now-this.lastCamera)/1000,.25) * 7); this.lastCamera=now;
     this.angle += (this.desiredAngle - this.angle) * speed; this.zoom += (this.desiredZoom - this.zoom) * speed;
     const aspect = this.camera.aspect, fit = aspect < .85 ? 1.28 : aspect < 1.1 ? 1.12 : 1;
-    let distance = 14.7 * fit / this.zoom;
+    let distance = (this.state.active ? 14.7 : 10.8) * fit / this.zoom;
     if (this.burst && this.state.cinematic && !this.state.reduced) distance -= Math.sin(Math.min((now - this.burst.start) / 1000, 1) * Math.PI) * .65;
     if(this.transition?.execution&&this.state.cinematic&&!this.state.reduced){const p=T.MathUtils.clamp((now-this.transition.start)/this.transition.duration,0,1);distance-=Math.sin(p*Math.PI)*.35;}
     this.camera.position.set(Math.sin(this.angle) * distance * .78, distance * .83, Math.cos(this.angle) * distance * .78); this.camera.lookAt(0, -.05, 0);

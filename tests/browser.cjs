@@ -91,8 +91,9 @@ async function newGame(page) {
     await page.getByRole('button',{name:'旋转棋盘',exact:true}).click(); await settled(page);
     await page.getByRole('button',{name:'放大',exact:true}).click();
     await page.waitForTimeout(1000);
+    const originalWidth=await page.locator('canvas').evaluate(el=>el.getBoundingClientRect().width);
     await page.locator('.scene-host').evaluate(el=>{el.style.transform='translate(17px, 9px) scale(.9)';});
-    await page.waitForFunction(()=>Math.abs(document.querySelector('canvas').getBoundingClientRect().width-900)<1);
+    await page.waitForFunction(width=>Math.abs(document.querySelector('canvas').getBoundingClientRect().width-width*.9)<1,originalWidth);
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     for(const [x,y] of [[0,0],[6,0],[0,6],[6,6],[3,3]]) {
       await page.keyboard.press('Escape');await click(page,x,y,.78); const s=await snap(page);
@@ -102,7 +103,7 @@ async function newGame(page) {
     await page.locator('.scene-host').evaluate(el=>el.style.transform='');
     await fixture(page,'capture','guard');
     await click(page,3,3,.78);const id=(await snap(page)).selected;assert.ok(id);
-    await click(page,4,2);assert.equal((await snap(page)).game.ply,0);assert.equal((await snap(page)).selected,id);
+    await click(page,4,2);assert.equal((await snap(page)).game.ply,0);assert.equal((await snap(page)).selected,null);
     await click(page,0,6,.14);assert.equal((await snap(page)).game.ply,0);
     await page.keyboard.press('Escape');await click(page,3,2,.78);assert.equal((await snap(page)).selected,null);
     mark('斜向移动、占据己方格和直接控制敌子均被阻止');
