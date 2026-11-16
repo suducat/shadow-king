@@ -142,5 +142,18 @@ text='''# 《暗王》V0.6：全知者与棋具精修验证报告
 
 新增美术为原创程序纹理／几何和现有Lucide（ISC）图标，原字体OFL许可保留。不含外部付费依赖、密钥或训练场个人对局数据。上线检查记录由现有GitHub Pages工作流与公开URL确认。
 '''
+if (data/'deployment.json').exists():
+ d=json.load(open(data/'deployment.json'));worker=d['browser']['worker']
+ text+=f"""
+## 线上部署确认
+
+运行代码提交：`{d['runtimeCommit']}`。[Pages发布成功]({d['pagesWorkflow']}) · [CI测试与构建成功]({d['validationWorkflow']})。公开URL返回200，线上主JS及Worker与本地正式构建逐字节一致，Worker指纹与24局实际预算测试相同。后续证据文档补充不改变游戏产物。
+
+通过公开站点实际进入第五档、确认布阵、完成玩家与AI各一步，并确认回到玩家回合；实际收到独立Worker决策，搜索{worker['elapsed']/1000:.3f}秒、{worker['nodes']:,}个搜索／策略评估节点，完成深度{worker['diagnostics']['depth']}。这是一次上线检查，不是额外的强度样本。无控制台错误或缺失资源，生产页面无开发夹具。
+
+云端Chromium的代理证书需要仅测试上下文的`CLOUD_PROXY_TLS=1`选项；curl保持默认TLS验证，确认公开站点与资产。正式游戏没有更改TLS设置。
+
+[上线检查原始记录](data/deployment.json) · [线上桌面截图](screenshots/live-desktop.png) · [线上手机截图](screenshots/live-mobile.png)。线上截图采用低画质、DPR0.5；同场景前后比较仍为前述DPR1图像。
+"""
 (root/'REPORT.md').write_text(text)
 print('Wrote',root/'REPORT.md')

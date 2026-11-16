@@ -1,0 +1,51 @@
+{
+  "verifiedAt": "2026-11-16T12:31:30.836695+00:00",
+  "runtimeCommit": "323a73967bc27ce0734d872a13e289274d535df3",
+  "pagesWorkflow": "https://github.com/suducat/shadow-king/actions/runs/43866183873",
+  "validationWorkflow": "https://github.com/suducat/shadow-king/actions/runs/43866183808",
+  "workflowConclusions": "success",
+  "assetVerification": {
+    "url": "https://suducat.github.io/shadow-king/",
+    "status": 200,
+    "commit": "323a73967bc27ce0734d872a13e289274d535df3",
+    "javascript": "index-eCtsrqZt.js",
+    "worker": "ai.worker-CvSaXzvM.js",
+    "workerSha256": "d5817f5da76fbae4aa796128b1b226d59d6333da6d649c68ea32580cdaf66f23",
+    "matched": true,
+    "tls": "curl default certificate verification, environment proxy"
+  },
+  "browser": {
+    "url": "https://suducat.github.io/shadow-king/",
+    "errors": [],
+    "failed": [],
+    "cloudProxyCertificateException": true,
+    "status": 200,
+    "worker": {
+      "action": {
+        "id": "blue-3",
+        "x": 3,
+        "y": 1
+      },
+      "nodes": 28632,
+      "samples": 1,
+      "elapsed": 1900.7000000001863,
+      "algorithm": "asymmetric informed expectimax + public opponent policy + iterative TT search",
+      "diagnostics": {
+        "depth": 4,
+        "rounds": 66,
+        "worlds": 1,
+        "entropy": 0,
+        "style": 0,
+        "inferenceStates": 12210
+      }
+    },
+    "checks": [
+      "Live Pages HTTPS200",
+      "Five cards and explicit challenge disclosure",
+      "Actual production Worker completed one AI action",
+      "Persistent challenge ribbon; no dev controls or fallback board",
+      "Desktop/mobile layout no overflow"
+    ],
+    "complete": true
+  }
+}

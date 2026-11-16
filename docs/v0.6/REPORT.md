@@ -128,3 +128,13 @@
 5. Worker连预检查回退都无法生成的异常失败路径，只能恢复一个合法行动；不保证该异常行动有同等棋力。
 
 新增美术为原创程序纹理／几何和现有Lucide（ISC）图标，原字体OFL许可保留。不含外部付费依赖、密钥或训练场个人对局数据。上线检查记录由现有GitHub Pages工作流与公开URL确认。
+
+## 线上部署确认
+
+运行代码提交：`323a73967bc27ce0734d872a13e289274d535df3`。[Pages发布成功](https://github.com/suducat/shadow-king/actions/runs/43866183873) · [CI测试与构建成功](https://github.com/suducat/shadow-king/actions/runs/43866183808)。公开URL返回200，线上主JS及Worker与本地正式构建逐字节一致，Worker指纹与24局实际预算测试相同。后续证据文档补充不改变游戏产物。
+
+通过公开站点实际进入第五档、确认布阵、完成玩家与AI各一步，并确认回到玩家回合；实际收到独立Worker决策，搜索1.901秒、28,632个搜索／策略评估节点，完成深度4。这是一次上线检查，不是额外的强度样本。无控制台错误或缺失资源，生产页面无开发夹具。
+
+云端Chromium的代理证书需要仅测试上下文的`CLOUD_PROXY_TLS=1`选项；curl保持默认TLS验证，确认公开站点与资产。正式游戏没有更改TLS设置。
+
+[上线检查原始记录](data/deployment.json) · [线上桌面截图](screenshots/live-desktop.png) · [线上手机截图](screenshots/live-mobile.png)。线上截图采用低画质、DPR0.5；同场景前后比较仍为前述DPR1图像。
