@@ -152,7 +152,7 @@ export class BoardScene {
   }
   private makeHall() {
     const stone = mat(0x162023, .15, .9);
-    const floor = mesh(new T.PlaneGeometry(150, 150), new T.MeshBasicMaterial({color:0x0c1215}), 0, -.78, 0, this.scene); floor.rotation.x = -Math.PI / 2;
+    const floor = mesh(new T.PlaneGeometry(150, 150), new T.MeshBasicMaterial({color:0x0c1215,toneMapped:false}), 0, -.78, 0, this.scene); floor.rotation.x = -Math.PI / 2;
     const ritual = new T.Group(); ritual.position.y = -.765; this.scene.add(ritual);
     [5.3, 5.45, 5.7, 6.5].forEach(r => ring(ritual, r, 0, GOLD, .14));
     for (let i = 0; i < 32; i++) {
