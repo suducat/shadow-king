@@ -205,7 +205,7 @@ export class BoardScene {
       if(next.viewer!==this.state.viewer||!next.active||next.deployment||!incoming||incoming.role!==tr.actor.role||incoming.x!==tr.to.x+3||incoming.y!==tr.to.z+3||next.pieces.some(p=>tr.victims.some(v=>v.id===p.id)))this.cancelMove();
     }
     const previousViewer = this.state.viewer;
-    if(next.viewer!==previousViewer)this.fx.clearTransient();
+    if(next.viewer!==previousViewer||next.active!==this.state.active)this.fx.clearTransient();
     if(next.viewer!==previousViewer&&this.burst){this.root.remove(this.burst.group);this.disposeGroup(this.burst.group);this.burst=null;}
     this.state = next;
     if (next.viewer && next.viewer !== previousViewer) this.desiredAngle = next.viewer === 'blue' ? Math.PI + .55 : .55;
@@ -290,7 +290,8 @@ export class BoardScene {
     this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
     for(const v of tr.victims)this.removeActor(v.id,v.actor);
     if(!completed||tr.silent){this.audioQueue=this.audioQueue.filter(c=>c.options.group!==tr.groupKey);this.onBattleCancel?.(tr.groupKey);}
-    this.fx.clearAction();this.clearCameraImpulse();tr.finish(completed);
+    if(completed)this.fx.clearAction();else this.fx.clearTransient();
+    this.clearCameraImpulse();tr.finish(completed);
   }
   private clearCameraImpulse(){this.cameraImpulse=null;if(this.cameraBase.lengthSq()){this.camera.position.copy(this.cameraBase);this.camera.lookAt(0,-.05,0);this.camera.updateMatrixWorld();}}
   private stepMove(now:number){
@@ -465,7 +466,7 @@ export class BoardScene {
     const moving=!!this.transition||!!this.burst||this.fx.transients.length>0||ready==='false';
     if (!document.hidden&&(this.dirty||moving||(!this.state.reduced&&now-this.lastRender>1000/QUALITY[this.quality].idleFps))){
       this.renderer.render(this.scene,this.camera);this.renderedFrames++;this.lastRender=now;this.dirty=false;
-      const cues=this.audioQueue.splice(0);if(!document.hidden)for(const cue of cues)if(now-cue.at<180)this.onBattleCue?.(cue.kind,cue.options);
+      const cues=this.audioQueue.splice(0);if(!document.hidden)for(const cue of cues)if(actionTime-cue.at<180)this.onBattleCue?.(cue.kind,cue.options);
     }
   };
   skipMove(){if(!this.transition)return;this.lastSkipped=true;this.transition.silent=true;this.stepMove(this.transition.start+this.transition.duration+1);this.fx.clearTransient();this.audioQueue=[];this.clearCameraImpulse();}

@@ -14,4 +14,18 @@ async function openGame(browser,dir='dist-test',opts={},qa=true){
  await page.goto('http://shadow-king.test/');if(qa)await page.waitForFunction(()=>window.__SK_QA__);else await page.evaluate(()=>document.fonts.ready);return{page,context,errors};
 }
 const launch=()=>require('playwright').chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-module.exports={root,openGame,launch};
+// Wait for an actual renderer frame before reading pose, effects or audio.
+// Sample inside the page so repeated driver reads cannot reuse an older pose.
+async function holdFrame(page,progress){
+ return page.evaluate(async progress=>{
+  const q=window.__SK_QA__;q.holdAction(progress);
+  const deadline=performance.now()+30000;
+  while(performance.now()<deadline){
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   const frame=await q.combatFrame();
+   if(Math.abs(frame.progress-progress)<1e-5)return frame;
+  }
+  throw new Error('Renderer did not reach held progress '+progress);
+ },progress);
+}
+module.exports={root,openGame,launch,holdFrame};
