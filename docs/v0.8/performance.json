@@ -1,0 +1,189 @@
+{
+  "device": "Linux Chromium SwiftShader software GPU; DPR .65; 1024×768; medium detail; equal render density, full animation; warm up 3 rendered frames, then 3 × 3s samples",
+  "rows": [
+    {
+      "stage": "before",
+      "mode": "classic",
+      "samples": [
+        {
+          "fps": 1.330273703814395,
+          "calls": 339,
+          "triangles": 238942,
+          "modelVertices": 594941
+        },
+        {
+          "fps": 1.3312034078812194,
+          "calls": 339,
+          "triangles": 238942,
+          "modelVertices": 594941
+        },
+        {
+          "fps": 1.3310705134606156,
+          "calls": 339,
+          "triangles": 238942,
+          "modelVertices": 594941
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "mode": "ritual",
+      "samples": [
+        {
+          "fps": 1.3317795904777758,
+          "calls": 458,
+          "triangles": 240174,
+          "modelVertices": 594941
+        },
+        {
+          "fps": 0.999000999000999,
+          "calls": 458,
+          "triangles": 240174,
+          "modelVertices": 594941
+        },
+        {
+          "fps": 1.331646580997073,
+          "calls": 458,
+          "triangles": 240174,
+          "modelVertices": 594941
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "mode": "classic",
+      "samples": [
+        {
+          "fps": 1.3317795904777758,
+          "calls": 340,
+          "triangles": 238942,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              310
+            ]
+          }
+        },
+        {
+          "fps": 1.6635613521428732,
+          "calls": 340,
+          "triangles": 238942,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              310
+            ]
+          }
+        },
+        {
+          "fps": 0.9985022466300549,
+          "calls": 340,
+          "triangles": 238942,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              310
+            ]
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "mode": "ritual",
+      "samples": [
+        {
+          "fps": 1.3308048042048484,
+          "calls": 459,
+          "triangles": 240174,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              397
+            ]
+          }
+        },
+        {
+          "fps": 1.332001332001332,
+          "calls": 459,
+          "triangles": 240174,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              397
+            ]
+          }
+        },
+        {
+          "fps": 1.3323118942149315,
+          "calls": 459,
+          "triangles": 240174,
+          "modelVertices": 162950,
+          "rendering": {
+            "batchingEnabled": false,
+            "batches": {
+              "draws": 0,
+              "parts": 0,
+              "instances": []
+            },
+            "bufferResizes": 2,
+            "density": 0.6499999761581421,
+            "buffer": [
+              399,
+              397
+            ]
+          }
+        }
+      ],
+      "errors": []
+    }
+  ]
+}
