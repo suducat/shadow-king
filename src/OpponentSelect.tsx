@@ -1,23 +1,9 @@
-import {ArrowLeft,ArrowRight,Check,Crown,Shield,Sparkles,Swords,Eye,Orbit} from 'lucide-react';
+import {ArrowLeft,Check,Crown,Shield,Sparkles,Swords,Eye,Orbit} from 'lucide-react';
 import {DIFFICULTIES,OMNISCIENT_NOTICE,type Difficulty} from './ai';
 import type {GameMode} from './ritual';
 const portraits={easy:Shield,normal:Swords,hard:Sparkles,master:Crown,omniscient:Eye};
-const audience:Record<Difficulty,string>={easy:'适合初次执棋，熟悉移动与三种胜法。',normal:'适合已熟悉规则，想练习攻防转换的玩家。',hard:'适合喜欢推测身份、布置献祭诱饵的玩家。',master:'适合愿意推演多步风险的熟手。',omniscient:'适合已掌握隐藏身份博弈，想挑战信息劣势的玩家。'};
+const copy:Record<Difficulty,string>={easy:'行动较直接，适合第一次熟悉移动、吃子与献祭。',normal:'兼顾进攻与防守，适合已经了解胜利条件的玩家。',hard:'会考虑后续回应与祭台争夺，适合希望多一些变化的玩家。',master:'投入更多本地计算，权衡多步行动与风险，适合愿意耐心思考的玩家。',omniscient:'在它眼中，没有秘密。以真实身份展开战术推演，用独立搜索追求极高胜率。'};
 export function OpponentSelect({difficulty,rule,select,back,start}:{difficulty:Difficulty;rule:GameMode;select:(d:Difficulty)=>void;back:()=>void;start:()=>void}){
- const levels=Object.keys(DIFFICULTIES) as Difficulty[],d=DIFFICULTIES[difficulty],Icon=portraits[difficulty],omniscient=difficulty==='omniscient';
- return <main className="court-selection opponent-court">
-  <div className="court-options"><button className="court-back" onClick={back}><ArrowLeft size={16}/>返回模式选择</button><h1>选择对手</h1>
-   <div className="rank-list">{levels.map(level=>{const entry=DIFFICULTIES[level],Badge=portraits[level];return <button className="rank-choice difficulty-card" key={level} onClick={()=>select(level)} aria-pressed={level===difficulty}>
-    <Badge size={21}/><span><strong>{entry.name}</strong><small>{entry.title}</small></span><em>{level==='omniscient'?'全身份透视':entry.label}</em><Check className="choice-check" size={16}/>
-   </button>;})}</div>
-  </div>
-  <section className={'opponent-exhibit tier-'+difficulty} aria-live="polite">
-   <div className="exhibit-crest" aria-hidden="true"><div className="crest-rim"/><Icon/>{omniscient&&<Orbit className="crest-orbit"/>}</div>
-   <div className="exhibit-copy"><small>{rule==='classic'?'经典规则':'祭典规则'}　／　{d.label}</small><h2>{d.name}</h2><p className="opponent-title">{d.title}</p>
-    <p>{audience[difficulty]}</p>
-    {omniscient&&<div id="omniscient-disclosure" className="challenge-disclosure" role="note"><strong><Eye size={17}/>全身份透视</strong><p>{OMNISCIENT_NOTICE}</p></div>}
-    <button className="primary" aria-describedby={omniscient?'omniscient-disclosure':undefined} onClick={start}>{omniscient?'开始全知挑战':'开始布阵'}<ArrowRight size={17}/></button>
-   </div>
-  </section>
- </main>;
+ const keys=Object.keys(DIFFICULTIES) as Difficulty[],rank=keys.indexOf(difficulty),d=DIFFICULTIES[difficulty],Icon=portraits[difficulty],omniscient=difficulty==='omniscient';
+ return <div className="opponent-layout"><section className="mode-panel difficulty-panel"><button className="text-back" onClick={back}><ArrowLeft size={16}/>返回模式选择</button><div className="eyebrow">永夜王庭 · 选择对手</div><h2>与谁共谋命运</h2><p>四位王庭对手，一位帷幕之外的挑战者。</p>{keys.map(level=>{const info=DIFFICULTIES[level],Badge=portraits[level],special=level==='omniscient';return <button key={level} aria-pressed={difficulty===level} className={`mode-card difficulty-card ${special?'omniscient-card':''}`} onClick={()=>select(level)}><span className="opponent-card-icon"><Badge size={28}/>{special&&<Orbit size={45}/>}</span><div><strong>{info.name}<em>{info.title}</em></strong><small>{info.label} · {special?'全身份透视 · 玩家主动选择的不对称挑战':copy[level]}</small></div>{difficulty===level&&<><Check size={18}/><span className="sr-only">已选中</span></>}</button>})}</section><section className={`opponent-portrait rank-${rank} ${omniscient?'omniscient-portrait':''}`} aria-live="polite"><div className="opponent-seal"><Icon size={76} strokeWidth={1}/>{omniscient&&<><Orbit className="omniscient-orbit" size={154}/><span className="seal-outer"/></>}<span>{'◇ '.repeat(rank+1)}</span></div><p className="eyebrow">{omniscient?'帷幕之外 · 终极挑战':`王庭第 ${rank+1} 席 · ${d.label}`}</p><h2>{d.name}</h2><p>{d.title}</p><p className="opponent-description">{copy[difficulty]}</p>{omniscient&&<div id="omniscient-disclosure" className="challenge-disclosure" role="note"><strong><Eye size={18}/> 全身份透视</strong><p>{OMNISCIENT_NOTICE}</p><small>只获得身份与计算优势；行动次数、斩杀与胜负规则保持一致。强度仍需实战验证。</small></div>}<div className="match-summary">{rule==='classic'?'经典规则':'祭典规则'} · {d.name} · 你执红</div><button className={`primary full ${omniscient?'challenge-start':''}`} aria-describedby={omniscient?'omniscient-disclosure':undefined} onClick={start}>{omniscient?'开始全知挑战':'开始布阵'} <Swords size={18}/></button><small>{omniscient?'身份透视仅授予本档 AI，玩家仍面对封印棋子。':'本地运算 · 无需联网 · 不读取敌方秘密身份'}<br/>{omniscient?'独立 Worker 运算，常规预算约2秒，复杂局面最多5秒。':'难度为相对档位，不代表经过评级的棋力。'}</small></section></div>;
 }

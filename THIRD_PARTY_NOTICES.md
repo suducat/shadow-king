@@ -33,7 +33,3 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 V0.2 includes Court Serif, a renamed character subset of Noto Serif CJK SC (Google / Adobe), licensed under SIL OFL 1.1. Original notices and full license: public/fonts/LICENSE.txt. This font is served locally; no Google Fonts request is required.
-
-王庭展示插画
-
-public/court/court.webp 与 altar.webp 是本项目使用 OpenAI 图像生成工具创作的菜单插画，随正式版分发。对局中的棋盘与棋子继续使用本地程序化 3D 模型。
