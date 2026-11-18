@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "freezeMilliseconds": 2300,
+  "method": "Chromium Page.setWebLifecycleState frozen/active with held setup frame; resume samples actual elapsed time",
+  "ply": 3,
+  "captures": 2,
+  "impacts": 2,
+  "staleHitSounds": 0,
+  "survivorsIntact": true,
+  "errors": []
+}

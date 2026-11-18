@@ -32,7 +32,8 @@
     "test:combat": "tsx --test tests/combat.test.ts tests/battle-timeline.test.ts",
     "test:combat:browser": "node tests/combat-browser.cjs",
     "test:combat:production": "node tests/combat-production.cjs && node tests/combat-production.cjs --ritual",
-    "record:combat": "node scripts/v07-reel.cjs"
+    "record:combat": "node scripts/v07-reel.cjs",
+    "test:combat:background": "node tests/combat-background.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

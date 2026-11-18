@@ -47,6 +47,7 @@ npm run preview
 npm test
 npm run build:test
 npm run test:combat:browser
+npm run test:combat:background
 npm run build
 npm run test:combat:production
 node tests/combat-production.cjs --restart

@@ -1,0 +1,35 @@
+{
+  "url": "https://suducat.github.io/shadow-king/",
+  "errors": [],
+  "failed": [],
+  "cloudProxyCertificateException": true,
+  "status": 200,
+  "worker": {
+    "action": {
+      "id": "blue-3",
+      "x": 5,
+      "y": 1
+    },
+    "nodes": 27659,
+    "samples": 1,
+    "elapsed": 1900.0999999996275,
+    "algorithm": "asymmetric informed expectimax + public opponent policy + iterative TT search",
+    "diagnostics": {
+      "depth": 4,
+      "rounds": 58,
+      "worlds": 1,
+      "entropy": 0,
+      "style": 0,
+      "inferenceStates": 12210
+    }
+  },
+  "checks": [
+    "Live Pages HTTPS200",
+    "Five cards and explicit challenge disclosure",
+    "Actual production Worker completed one AI action",
+    "Persistent challenge ribbon; no dev controls or fallback board",
+    "Desktop/mobile layout no overflow",
+    "Published before/after review page with four opt-in video players"
+  ],
+  "complete": true
+}
