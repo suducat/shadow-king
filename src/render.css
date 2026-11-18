@@ -6,3 +6,11 @@
 .app:has(.board-hud) .selected-card{margin-bottom:0}
 .game-scene::after{display:block;content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,#0b1319 0,transparent 5%,transparent 94%,#0b1319 100%);box-shadow:none;z-index:1}
 .skill-context.guard-controls{background:linear-gradient(140deg,#1d2b30,#101a20);backdrop-filter:none}
+/* A sidebar growing/shrinking must never resize the absolute board viewport. */
+@media(min-width:801px){
+ .phase-setup,.phase-play,.phase-handoff{height:100dvh;min-height:0}
+ .game-layout{height:calc(100dvh - 88px);min-height:0;grid-template-rows:minmax(0,1fr)}
+ .game-layout .left-sidebar,.game-layout .right-sidebar{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable;pointer-events:auto}
+ .game-layout .board-interface{height:100%;min-height:0}
+}
+@media(min-width:801px) and (max-width:950px) and (max-height:500px){.game-layout{height:calc(100dvh - 64px)}}
