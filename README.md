@@ -1,10 +1,16 @@
-# 暗王 · SHADOW KING — V0.8.1
+# 暗王 · SHADOW KING — V0.8.2
 
 双人奇幻隐藏身份策略棋，使用 React、TypeScript、Three.js、Vite 与 Web Audio。完整游戏在浏览器本地运行，支持本地双人、四档公平 AI、全知者透视挑战、经典模式和祭典模式。
 
 此仓库是正式游戏发行版，已整合复盘后的风险评估、完整祭典回应验证与合法格点击修复。无需后端、数据库、模型 API 或访问令牌。
 
 普通落子、普通吃子和双目标斩杀的同机位录屏与帧号见[动作对照](https://suducat.github.io/shadow-king/review/motion/)。
+
+## V0.8.2 王庭构图
+
+经典与祭典共用一个选择页。切换规则会更换王庭展示和胜利条件说明，随后可直接开始本地双人或选择 AI。对弈时，行动方与回合紧邻棋盘，规则和公开战报可从上方打开。手机横屏将操作栏移到棋盘侧面。
+
+[四种尺寸的浏览器截图对照](https://suducat.github.io/shadow-king/review/court/) · [构图与验收记录](docs/v0.8/COURT.md)
 
 ## 启动
 

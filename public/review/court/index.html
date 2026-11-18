@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>王庭构图对照 · 暗王</title>
+  <style>
+    :root{color-scheme:dark;font:16px system-ui,sans-serif;color:#ede6d5;background:#10171c}
+    *{box-sizing:border-box}body{margin:0;padding:clamp(16px,3vw,50px)}
+    header,form,main{max-width:1600px;margin:auto}header{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+    h1{font:500 clamp(24px,3vw,45px) Georgia,serif;letter-spacing:.08em;margin:0}
+    a{color:#e2c696}form{display:flex;flex-wrap:wrap;gap:16px;padding:23px 0}label{display:flex;align-items:center;gap:8px}
+    select{font:inherit;min-height:44px;padding:6px 8px;background:#202a31;color:#f5ecd8;border:1px solid #99845d}
+    main{display:grid;grid-template-columns:1fr 1fr;gap:14px}figure{margin:0;min-width:0}figcaption{margin:0 0 8px;color:#d0bc95}
+    figure a{display:block;text-align:center;background:#0b1116;border:1px solid #8a77545c}
+    img{max-width:100%;max-height:73vh;vertical-align:middle}footer{max-width:1600px;margin:14px auto;color:#b3bab8;font-size:14px}
+    @media(max-width:700px){main{grid-template-columns:1fr}form{gap:7px}label{font-size:14px}img{max-height:65vh}}
+  </style>
+</head>
+<body>
+<header><h1>王庭构图对照</h1><a href="../../">进入游戏</a></header>
+<form><label>视口 <select id="size"><option>1440x900</option><option>1280x720</option><option>390x844</option><option>844x390</option></select></label>
+<label>画面 <select id="scene"><option value="classic">模式 · 经典</option><option value="ritual">模式 · 祭典</option><option value="home">主页</option><option value="ai">全知者选择</option><option value="setup">秘密布阵</option><option value="play">第一回合</option></select></label></form>
+<main><figure><figcaption>更新前 · V0.8.1</figcaption><a id="before"><img alt="更新前游戏截图"></a></figure>
+<figure><figcaption>更新后 · 王庭构图</figcaption><a id="after"><img alt="更新后游戏截图"></a></figure></main>
+<footer>点击画面查看原尺寸。两版使用相同的 Chromium 视口、低画质与减少动态效果设置。</footer>
+<footer>祭典回归局面（1280 × 720）　<a href="open.webp">最后死士被吃后</a>　<a href="occupied.webp">王占领后等待回应</a></footer>
+<script>
+const size=document.querySelector('#size'),scene=document.querySelector('#scene');
+const query=new URLSearchParams(location.search);
+for(const select of [size,scene])if(Array.from(select.options).some(o=>o.value===query.get(select.id)))select.value=query.get(select.id);
+function show(){
+ for(const stage of ['before','after']){
+   const link=document.getElementById(stage),url=stage+'/'+size.value+'/'+scene.value+'.webp';
+   link.href=url;link.firstElementChild.src=url;
+ }
+ history.replaceState(null,'','?'+new URLSearchParams({size:size.value,scene:scene.value}));
+}
+size.onchange=scene.onchange=show;show();
+</script>
+</body></html>

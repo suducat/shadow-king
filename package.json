@@ -1,7 +1,7 @@
 {
   "name": "shadow-king",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -35,6 +35,7 @@
     "record:combat": "node scripts/v07-reel.cjs",
     "test:combat:background": "node tests/combat-background.cjs",
     "test:rendering": "tsx --test tests/rendering.test.ts tests/quality.test.ts",
+    "test:court:browser": "node tests/court-browser.cjs",
     "test:rendering:browser": "node tests/rendering-browser.cjs"
   },
   "dependencies": {

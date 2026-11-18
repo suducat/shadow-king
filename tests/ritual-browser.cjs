@@ -1,7 +1,7 @@
 const{launch,openGame,root}=require('./support.cjs'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('PASS',s);fs.writeFileSync(path.join(root,'artifacts/rite-browser-report.json'),JSON.stringify(report,null,2));};
 (async()=>{const browser=await launch();let page;try{
- const boot=await openGame(browser,'dist-test',{deviceScaleFactor:.65});page=boot.page;report.errors=boot.errors;
+ const boot=await openGame(browser,'dist-test',{viewport:{width:1280,height:720},deviceScaleFactor:1,preferences:{quality:'low',reduced:true,muted:true}});page=boot.page;report.errors=boot.errors;
  const snap=()=>page.evaluate(()=>window.__SK_QA__.snapshot());
  const settled=()=>page.waitForFunction(()=>{const s=window.__SK_QA__.snapshot();return s.layoutReady&&Math.abs(s.camera.angle-s.camera.desiredAngle)<.001&&s.actors.every(a=>Math.abs(a.x-a.targetX)<.01&&Math.abs(a.y-a.targetY)<.01);});
  const fixture=async(name,mode='local')=>{await page.evaluate(([n,m])=>window.__SK_QA__.loadRitualFixture(n,m),[name,mode]);if(mode==='local')await settled();};
@@ -26,7 +26,8 @@ const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('P
  await fixture('empty');await pointer(3,4,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await hand('blue');await key(6,0);await key(6,1);await hand('red');await pointer(3,2,.8);s=await snap();assert.equal(s.game.pieces.find(p=>p.id==='red-0').executionUsed,true);assert.equal(await page.getByRole('button',{name:'蓄力',exact:true}).count(),0);await key(4,2);await hand('blue');assert.equal((await snap()).game.pieces.find(p=>p.id==='red-0').x,4);
  mark('空斩消耗独立次数；后续不可蓄力但可正常移动');
  await fixture('opening');await pointer(3,3,.8);await pointer(3,2);await ack();assert.equal((await snap()).game.result,null);await hand('blue');s=await snap();assert.equal(s.rendered.find(p=>p.id==='blue-3').role,'king');assert.equal(s.game.ritual.blue.phase,'open');
- await key(0,0);await key(0,1);await hand('red');assert.equal((await snap()).game.ritual.blue.phase,'occupied');await key(2,6);await key(2,5);await page.waitForSelector('.ending-ritual');assert.equal((await snap()).game.result.winner,'blue');assert.equal(await page.locator('[data-cinematic=ritual]').count(),1);assert.equal(await page.locator('.result-copy h1').innerText(),'祭典登临');await page.screenshot({path:path.join(root,'artifacts/rite-victory.png')});
+ assert.match(await page.locator('.altar-state-banner').innerText(),/幽蓝王庭 · 祭典开启/);await page.screenshot({path:'artifacts/court-open.png'});
+ await key(0,0);await key(0,1);await hand('red');assert.equal((await snap()).game.ritual.blue.phase,'occupied');assert.match(await page.locator('.altar-state-banner').innerText(),/绯红王庭有一次完整回应机会/);await page.screenshot({path:'artifacts/court-occupied.png'});await key(2,6);await key(2,5);await page.waitForSelector('.ending-ritual');assert.equal((await snap()).game.result.winner,'blue');assert.equal(await page.locator('[data-cinematic=ritual]').count(),1);assert.equal(await page.locator('.result-copy h1').innerText(),'祭典登临');await page.screenshot({path:path.join(root,'artifacts/rite-victory.png')});
  mark('最后死士触发王公开；王已在祭台仍须己方行动，再守过敌方回应；独立祭典结算');
  await fixture('counter');await pointer(4,4,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await ack();await page.waitForSelector('.ending-king');s=await snap();assert.equal(s.game.result.winner,'red');assert.equal(s.game.lastAction.steps.length,1);assert.equal(s.game.pieces.find(p=>p.id==='red-0').y,3);assert.ok(s.game.pieces.some(p=>p.id==='blue-0'));
  mark('回应回合斩杀祭台王：弑王优先，第二格不执行、不误删');

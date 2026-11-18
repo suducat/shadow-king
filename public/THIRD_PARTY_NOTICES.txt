@@ -35,3 +35,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 V0.2 includes Court Serif, a renamed character subset of Noto Serif CJK SC (Google / Adobe), licensed under SIL OFL 1.1. Original notices and full license: public/fonts/LICENSE.txt. This font is served locally; no Google Fonts request is required.
 
 V0.6: stone grain, metal patina, fabric normal/bump patterns, contact projections, engraved bases and UI seals are original procedural/code-authored artwork included in this repository. No downloaded character models, paid services, API keys or external texture requests are added. Existing Lucide ISC and Court Serif OFL notices continue to apply.
+
+王庭展示插画
+
+public/court/court.webp 与 altar.webp 是本项目使用 OpenAI 图像生成工具创作的菜单插画，随正式版分发。对局中的棋盘与棋子继续使用本地程序化 3D 模型。
