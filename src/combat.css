@@ -1,0 +1,38 @@
+/* Temporal staging follows the shared combat clock, not CSS completion events. */
+.impact-disclosure{position:fixed;z-index:20;left:50%;top:20%;transform:translateX(-50%);pointer-events:none;padding:.6rem 1.1rem;border:1px solid #ae9461;background:#10131dec;color:#e9dcc4;font-size:.85rem;letter-spacing:.15em;box-shadow:0 5px 24px #0008}
+.ending-milestones{position:absolute;width:min(540px,85vw);height:350px;left:50%;top:14%;transform:translateX(-50%);fill:none;stroke:currentColor;stroke-width:1;pointer-events:none;color:#cab178;opacity:.6}
+.end-cinematic[data-stage=gather] .ending-milestones{opacity:.14}
+.fate-chain{stroke-dasharray:480;stroke-dashoffset:calc(480px * (1 - var(--ending-progress,0)));opacity:.5}
+.fate-fracture{opacity:0;stroke:#e6d2a5;stroke-width:1.8}
+.end-cinematic[data-stage=climax] .fate-fracture,.end-cinematic[data-stage=settle] .fate-fracture{opacity:.8}
+.end-cinematic[data-stage=gather] .broken-crown path{transform:none!important;opacity:1!important}
+.end-cinematic[data-stage=gather] .royal-shockwave{visibility:hidden}
+.end-cinematic[data-stage=seal] .broken-crown path{filter:brightness(1.12)}
+.milestone-guard{color:#acccdc}
+.fallen-link{opacity:.7;stroke-width:1.4}
+.end-cinematic[data-seals="1"] .link-0,.end-cinematic[data-seals="2"] .link-0,.end-cinematic[data-seals="2"] .link-1,.end-cinematic[data-seals="3"] .fallen-link{opacity:.12;stroke-dasharray:9 12}
+.end-cinematic[data-stage=gather] .guard-oath svg,.end-cinematic[data-stage=gather] .collapsing-array{opacity:1!important;transform:none!important}
+.milestone-martyr{color:#c5a1da}.offering-ray{stroke-width:1.4;stroke-dasharray:90;stroke-dashoffset:calc(90px * (1 - var(--ending-progress,0)));opacity:.7}
+.fate-convergence{transform-origin:180px 130px;transform:scale(calc(.5 + var(--ending-progress,0) * 1.5));stroke:#e5c58e}
+.end-cinematic[data-stage=gather] .sacrifice-flare{visibility:hidden}
+.end-cinematic[data-stage=gather] .great-seal{opacity:.25!important}
+.milestone-ritual{color:#d2b1e8}.rite-held{stroke:#d8be83;stroke-width:2;stroke-dasharray:544;stroke-dashoffset:calc(544px * (1 - var(--ending-progress,0)))}
+.rite-answer{opacity:0}.end-cinematic[data-stage=seal] .rite-answer{opacity:.7}
+.end-cinematic[data-stage=gather] .rite-defense-wave{visibility:hidden}
+.cinematic-reduced *,.cinematic-skipped *{animation:none!important;transition:none!important}
+.cinematic-reduced .ending-milestones,.cinematic-skipped .ending-milestones{opacity:.35}
+@media(prefers-reduced-motion:reduce){.ending-milestones{opacity:.35}}
+@media(max-width:700px){.ending-milestones{height:260px;top:18%}.impact-disclosure{top:15%;font-size:.72rem;padding:.6rem .8rem;white-space:nowrap}}
+.ending-milestones{height:240px;top:0}
+.end-cinematic.cinematic-skipped .cinematic-skip{display:block}
+.cinematic-skip{min-height:40px;z-index:3;font-size:10px}
+.resignation-stage svg{width:240px;height:160px;fill:#34232a;stroke:#ac986e;stroke-width:1;transform:rotate(-8deg)}
+/* Reduced/skip settles into an authored final tableau rather than CSS's base pose. */
+:is(.cinematic-reduced,.cinematic-skipped) .broken-crown path:not(:last-child){transform:translate(var(--dx),var(--dy)) rotate(var(--dr));opacity:.8}
+:is(.cinematic-reduced,.cinematic-skipped) .royal-runes{opacity:.2;transform:scale(.9)}
+:is(.cinematic-reduced,.cinematic-skipped) .royal-shockwave,:is(.cinematic-reduced,.cinematic-skipped) .silver-shatter{opacity:0}
+:is(.cinematic-reduced,.cinematic-skipped) .collapsing-array{opacity:.12;transform:scale(1.12) rotate(8deg)}
+:is(.cinematic-reduced,.cinematic-skipped) .guard-oath{opacity:.28;filter:brightness(.75);transform:translateY(12px) scale(.94)}
+:is(.cinematic-reduced,.cinematic-skipped) .great-seal,:is(.cinematic-reduced,.cinematic-skipped) .sacrifice-mark,:is(.cinematic-reduced,.cinematic-skipped) .rite-crown{opacity:1;transform:none}
+:is(.cinematic-reduced,.cinematic-skipped) .sacrifice-flare{opacity:.35;transform:none}
+:is(.cinematic-reduced,.cinematic-skipped) .cinematic-caption{opacity:1;transform:none}

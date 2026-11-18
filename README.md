@@ -1,4 +1,4 @@
-# 暗王 · SHADOW KING — V0.6.0
+# 暗王 · SHADOW KING — V0.7.0
 
 双人奇幻隐藏身份策略棋，使用 React、TypeScript、Three.js、Vite 与 Web Audio。完整游戏在浏览器本地运行，支持本地双人、四档公平 AI、全知者透视挑战、经典模式和祭典模式。
 
@@ -33,6 +33,26 @@ npm run preview
 - 祭典影卫需提前一回合公开蓄力，每枚整局一次斩杀，固定向前尽量移动两格；仅边界可缩短，友军阻挡时不能释放。
 
 本地双人使用隐私交接；人机对战由玩家执红，AI执蓝。四档公平难度为棋侍、影谋、诡相、无冕者，只接收自身身份与公开对局信息。第五档「全知者 · 帷幕之外」是玩家主动选择的透视挑战：它能够看见玩家全部真实身份，玩家仍看不见 AI 未公开身份。选择页有醒目告知和独立开始按钮，对局顶部持续标示。全部搜索在本地 Worker 中进行，不需要联网。
+
+## V0.7.0 战斗演出
+
+- 新增身体、双腿、武器、披风和王冠的关节动作；底座贴地，攻击按预备、发力、命中、余势、归位推进。
+- 命中后才公开目标并退场；斩杀逐个处理目标，音效、剑刃轨迹、局部冲击和短暂停顿共享时间轴。
+- 蓄力、祭典开启、占领和中断分段呈现；四类结算各有高潮，支持跳过与精简动画。
+- 隐藏敌方使用统一模型、动作和音色。原有规则、AI 和棋盘点击判断保持不变。
+
+[前后实时录屏与原声](https://suducat.github.io/shadow-king/review/v07/) · [实际测试、性能与限制](docs/v0.7/REPORT.md)。云端使用软件显卡，未做 Mac 或手机真机验收。
+
+```sh
+npm test
+npm run build:test
+npm run test:combat:browser
+npm run build
+npm run test:combat:production
+node tests/combat-production.cjs --restart
+```
+
+录像工具需 Playwright Chromium 和 ffmpeg；使用 `STAGE=before DIST=<旧版测试构建目录>` 或 `STAGE=after DIST=dist-test npm run record:combat`。逐帧与性能工具可通过 `BASELINE_DIST` 指定旧版测试构建。对照影片独立加载，不计入正式游戏首次资源请求。
 
 ## V0.6.0 改进
 

@@ -1,0 +1,73 @@
+{
+  "stage": "after",
+  "kind": "real-time browser recording; software GPU, not a fluidity claim",
+  "bundles": [
+    "index-BUH5uKbT.css",
+    "index-FqfYqg_1.js"
+  ],
+  "cases": [
+    {
+      "label": "king: normal move",
+      "wall": 1794972026355
+    },
+    {
+      "label": "guard: normal move",
+      "wall": 1794972030762
+    },
+    {
+      "label": "martyr: normal move",
+      "wall": 1794972035037
+    },
+    {
+      "label": "king: capture sealed target",
+      "wall": 1794972039245
+    },
+    {
+      "label": "guard: capture sealed target",
+      "wall": 1794972043233
+    },
+    {
+      "label": "martyr: capture sealed target",
+      "wall": 1794972047158
+    },
+    {
+      "label": "execution: two ordered targets",
+      "wall": 1794972052066
+    },
+    {
+      "label": "charge: wind-up and ready",
+      "wall": 1794972061468
+    },
+    {
+      "label": "rite opening: last martyr captured",
+      "wall": 1794972072146
+    },
+    {
+      "label": "ending: king",
+      "wall": 1794972095453
+    },
+    {
+      "label": "ending: guard",
+      "wall": 1794972104116
+    },
+    {
+      "label": "ending: martyr",
+      "wall": 1794972112877
+    },
+    {
+      "label": "ending: ritual occupation survives reply",
+      "wall": 1794972121645
+    }
+  ],
+  "errors": [],
+  "preferences": {
+    "music": 0,
+    "effects": 0.55,
+    "muted": false,
+    "cinematic": true,
+    "reduced": false,
+    "quality": "low"
+  },
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "complete": true
+}

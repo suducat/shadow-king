@@ -1,0 +1,105 @@
+{
+  "device": "Cloud Linux Chromium / SwiftShader software Vulkan; 1024×768, DPR .65, low quality; sequential paired runs",
+  "results": [
+    {
+      "stage": "before",
+      "device": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "cores": 3,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "preferences": {
+        "music": 0,
+        "effects": 0,
+        "muted": true,
+        "cinematic": true,
+        "reduced": false,
+        "quality": "low"
+      },
+      "samples": [
+        {
+          "fps": 1.6640596398973908,
+          "calls": 278,
+          "triangles": 143912
+        },
+        {
+          "fps": 2.663647865751817,
+          "calls": 278,
+          "triangles": 143912
+        },
+        {
+          "fps": 2.330459100442643,
+          "calls": 278,
+          "triangles": 143912
+        }
+      ],
+      "action": {
+        "elapsed": 1713.7000000001863,
+        "frames": 3
+      },
+      "assets": [
+        {
+          "file": "index-D722ph-X.js",
+          "raw": 911284,
+          "gzip": 259065
+        },
+        {
+          "file": "index-_fPaWWiD.css",
+          "raw": 71011,
+          "gzip": 16729
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "device": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "cores": 3,
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "preferences": {
+        "music": 0,
+        "effects": 0,
+        "muted": true,
+        "cinematic": true,
+        "reduced": false,
+        "quality": "low"
+      },
+      "samples": [
+        {
+          "fps": 1.646741099364459,
+          "calls": 339,
+          "triangles": 143912
+        },
+        {
+          "fps": 2.9896359287807837,
+          "calls": 339,
+          "triangles": 143912
+        },
+        {
+          "fps": 2.32743715919699,
+          "calls": 339,
+          "triangles": 143912
+        }
+      ],
+      "action": {
+        "elapsed": 1406.7000000001863,
+        "frames": 2
+      },
+      "assets": [
+        {
+          "file": "index-BUH5uKbT.css",
+          "raw": 74827,
+          "gzip": 17574
+        },
+        {
+          "file": "index-FqfYqg_1.js",
+          "raw": 927938,
+          "gzip": 265178
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

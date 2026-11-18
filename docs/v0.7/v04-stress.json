@@ -1,0 +1,492 @@
+{
+  "moves": 108,
+  "captures": 30,
+  "skips": 33,
+  "restarts": 27,
+  "midFrameChecks": 2328,
+  "frameRates": [
+    60,
+    15,
+    3
+  ],
+  "cases": [
+    {
+      "kind": "ready",
+      "fps": 60,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "single",
+      "fps": 60,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "edge",
+      "fps": 60,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "execute-open",
+      "fps": 60,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "purge",
+      "fps": 60,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "counter",
+      "fps": 60,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "ready",
+      "fps": 15,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "single",
+      "fps": 15,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "edge",
+      "fps": 15,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "execute-open",
+      "fps": 15,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "purge",
+      "fps": 15,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "counter",
+      "fps": 15,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "ready",
+      "fps": 3,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "single",
+      "fps": 3,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "edge",
+      "fps": 3,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "execute-open",
+      "fps": 3,
+      "impacts": 2,
+      "expected": 2
+    },
+    {
+      "kind": "purge",
+      "fps": 3,
+      "impacts": 1,
+      "expected": 1
+    },
+    {
+      "kind": "counter",
+      "fps": 3,
+      "impacts": 1,
+      "expected": 1
+    }
+  ],
+  "failures": [],
+  "states": [
+    {
+      "id": "red-0",
+      "role": "guard",
+      "weaponZ": -0.13,
+      "meshes": 27,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        1,
+        0.18,
+        0
+      ],
+      "materials": [
+        "35a96ab6-2e1d-45f2-b4c1-e6a09006ee16",
+        "3b8f8bf1-adbc-4892-8b23-70bf4cb18fd8",
+        "4b1dccc3-b12a-4fc1-9a9a-2fdc743f4c43",
+        "5640ddd8-2b76-4c4a-b827-e095b9850781",
+        "b692a22e-724f-428e-a14b-43035a99b8b9",
+        "c9c52767-dfd1-48df-a50d-fa53e8b64664",
+        "54924925-865f-440a-9c83-011a21c65cbc",
+        "03951d34-c946-4b89-ac17-45d527263671",
+        "52fff426-6df6-41c1-9c6b-04065f3445fd",
+        "86214841-35c5-4e94-8b72-4a97c7797c97"
+      ]
+    },
+    {
+      "id": "red-1",
+      "role": "martyr",
+      "weaponZ": 0,
+      "meshes": 22,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        -2,
+        0.18,
+        3
+      ],
+      "materials": [
+        "21c5a974-49fc-4c1e-8a01-91d79b1d0be1",
+        "337503c0-02e1-4e90-a71b-56153c371707",
+        "b0aad57d-980e-4fdc-8821-5287f33c4276",
+        "ea406df2-535a-46fb-bf14-df9217a30f68",
+        "3d6a90f5-e9c0-4701-8dc5-45e981d0303b",
+        "3e8f6438-26a5-4146-afb5-c36c160a72b0",
+        "95afcffb-39c3-4736-858d-65069730782d",
+        "971228fc-b277-417a-a475-ce28252c13c9",
+        "0bcefc41-9c6f-4589-97dd-813d9c00b561",
+        "60682c70-39c5-47de-a991-3d80185a4a04",
+        "b924dace-261d-4eb6-83da-b694de2c50f2"
+      ]
+    },
+    {
+      "id": "red-2",
+      "role": "guard",
+      "weaponZ": -0.13,
+      "meshes": 27,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        -1,
+        0.18,
+        3
+      ],
+      "materials": [
+        "f280ba94-9a2d-46dd-9790-fcd36f25a5c0",
+        "4d1a2d80-184e-4707-bd1d-89503f36ea9c",
+        "5f0c3d35-6eda-4af8-9b9e-65735b042942",
+        "9beeec1c-9a5c-4676-85ff-f91f9691a0db",
+        "ec5f74fa-436d-404b-b31e-a237bc582fca",
+        "05db4be8-abac-497c-a0e8-bc0eb57f5bdc",
+        "6801bebb-8f9c-427b-831e-5c13826a474f",
+        "18d3e155-f63c-46d1-bb8c-ae07af6cc6aa",
+        "1e49856f-03f6-432c-b8bd-df6c392ca345",
+        "83f55ed7-80f6-4db4-a212-daa2a38001af"
+      ]
+    },
+    {
+      "id": "red-3",
+      "role": "king",
+      "weaponZ": 0,
+      "meshes": 23,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        0,
+        0.18,
+        3
+      ],
+      "materials": [
+        "edf56067-6110-4f37-8413-30c781373cc1",
+        "84a07d99-b05b-4199-96e6-3c3e82e50b4d",
+        "aa5047e2-58b9-44d4-8b72-f3c3e53bad4a",
+        "489c146d-396d-4a8f-b1fd-6cfe8b2ec5d3",
+        "0acdf21b-66a4-4291-94e1-750c0f1ce6ae",
+        "8f9d7a5c-c03d-44b5-8e10-fd91ddbda7fb",
+        "75c0f360-f2f6-4474-8c0c-5f46c7ed6767",
+        "faa8d8ea-453b-4467-9d4f-c0fae6a716f8",
+        "7251592e-c71d-4829-9671-84b6406ee130",
+        "576e45ce-75d6-46c0-8772-c3c628512541",
+        "ee605816-ce8e-4230-95f5-03a291ebf505",
+        "e2abb8b4-f35b-45f7-b79a-bf306d8ba73c",
+        "daf91767-7ab0-4a65-89c2-45f5a924f248"
+      ]
+    },
+    {
+      "id": "red-4",
+      "role": "martyr",
+      "weaponZ": 0,
+      "meshes": 22,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        1,
+        0.18,
+        3
+      ],
+      "materials": [
+        "375df5ae-fdec-4f4c-9f86-733873474c6d",
+        "3af9cbe4-d8ab-4dad-8d2a-d52fd9ed3376",
+        "e67315cb-6a2f-4e41-b3e7-856a93a1584e",
+        "9ba6cc25-0707-4199-a0f9-9021869d53ec",
+        "cdf6055a-99d4-42a9-8c3b-15b9a9ba4740",
+        "d0d10b00-d124-4d6a-b8e1-e8920e791881",
+        "6610b351-23a5-4b29-848f-2a25bce6d5af",
+        "95257768-0185-4117-8bfb-30a405181c0c",
+        "32a42baa-2700-4f9e-bc50-d41a0a06e3af",
+        "8d1d1e77-065c-40dd-ae3d-2f312213ec70",
+        "0b962c47-f133-4b45-bcc3-0f041f9bded5"
+      ]
+    },
+    {
+      "id": "red-5",
+      "role": "guard",
+      "weaponZ": -0.13,
+      "meshes": 27,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        2,
+        0.18,
+        3
+      ],
+      "materials": [
+        "1245c0b8-0dd4-4788-bff3-f455b47680d6",
+        "996a8e60-d9c4-45f0-bbb9-1363ad60f440",
+        "9c33e5df-218b-4307-b97e-ad589b8da7dd",
+        "61b8ab2b-8acc-4617-b687-3b3ae8b0385c",
+        "f4d940bd-34cd-47e3-8c37-9e227285efdc",
+        "3f6507f0-db19-4759-8250-9109b58794c5",
+        "9165e1bc-db2e-4db4-9d92-a4b5c007ac6f",
+        "32351789-21fd-433b-918d-ce1825b48d6c",
+        "1977227b-5ccd-46a3-9cc0-80dafea5f483",
+        "7385d21a-bceb-4b99-a567-5eb53b17b639"
+      ]
+    },
+    {
+      "id": "red-6",
+      "role": "martyr",
+      "weaponZ": 0,
+      "meshes": 22,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        3,
+        0.18,
+        3
+      ],
+      "materials": [
+        "92cba9db-8f80-4e7d-bed0-1edb5b4c9a95",
+        "1296113a-3145-42ee-88d8-3da96ce62b03",
+        "112f97bb-3536-487f-b182-e23970d1eb2b",
+        "3d6e5079-2849-4896-a249-073d0e20cdf7",
+        "9c81090a-4aef-4d0a-b279-eb4e59b94921",
+        "723ce7da-6a61-468e-a4f0-f96db2128395",
+        "12f7ba1a-0fa3-4b1c-a480-5db911893615",
+        "84338ee7-75df-4957-ad5f-66ba55da291e",
+        "881dc18a-aff3-4829-9cae-e45aaedbeb88",
+        "37d95e1f-6934-437f-88b1-e6c46e28dd8d",
+        "4dc44710-e135-4b2a-95d5-f37e0e426b66"
+      ]
+    },
+    {
+      "id": "blue-0",
+      "role": "unknown",
+      "weaponZ": 0,
+      "meshes": 11,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        1,
+        0.18,
+        -1
+      ],
+      "materials": [
+        "f45608b4-fefa-485f-bfdf-1f463b3b0467",
+        "ea81f720-b269-4b78-845e-ca41cfe840ef",
+        "76a11551-e16a-45bb-825d-c52ddc31b8e4",
+        "e89880f9-63ab-4543-8eec-4263335703b6",
+        "4d705957-1332-4037-ab0d-ad484bf51f17",
+        "939c47fc-a52f-4e47-b1d4-a990c41df49b",
+        "685d88e2-181c-4a1f-b6cd-1e8a0f2a1357"
+      ]
+    },
+    {
+      "id": "blue-2",
+      "role": "unknown",
+      "weaponZ": 0,
+      "meshes": 11,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        0,
+        0.18,
+        -2
+      ],
+      "materials": [
+        "d27925d9-68ff-4aa3-9e3e-05b10c716dc2",
+        "0343de40-43a3-4ff5-a810-83470530c51f",
+        "b736e1a4-1f6c-4082-93d9-45892d1368d7",
+        "03f54514-6f85-44d5-89a3-1c2732f1d90b",
+        "dafcee61-5e71-47bf-b7a2-e572edf30823",
+        "542efe9b-6469-4052-ab08-9e6be26a5054",
+        "07027432-d624-4154-9833-1b2655eb3d6a"
+      ]
+    },
+    {
+      "id": "blue-5",
+      "role": "unknown",
+      "weaponZ": 0,
+      "meshes": 11,
+      "hidden": 0,
+      "zeroOpacity": 0,
+      "disposed": 0,
+      "visible": true,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "modelScale": [
+        1,
+        1,
+        1
+      ],
+      "position": [
+        2,
+        0.18,
+        -3
+      ],
+      "materials": [
+        "0f2543ac-87b3-4fd6-9807-37b267b44d9c",
+        "1f71b9fe-fe7d-4f2d-a281-223fce5bc410",
+        "7e8e2a5f-07e7-4d27-944d-ee08c345745b",
+        "a6a348c8-6b10-4a4e-951b-e95032359646",
+        "74d293a8-b5d4-48db-b8dd-c4e7d2122cc1",
+        "3e39e854-fcf5-4bf4-be89-c1fea26ad30b",
+        "9ead8d05-7d29-40c8-b00d-29926951bb06"
+      ]
+    }
+  ]
+}

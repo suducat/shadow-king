@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "actualMoveBeforeResign": true,
+  "restartToRedSetup": true,
+  "real3DSwapAfterRestart": true,
+  "errors": []
+}

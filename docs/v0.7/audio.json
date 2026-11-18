@@ -1,0 +1,22 @@
+{
+  "accepted": true,
+  "duplicate": false,
+  "afterCancel": {
+    "voices": 0,
+    "effectSources": 0,
+    "dedupeKeys": 1
+  },
+  "max": {
+    "voices": 12,
+    "effectSources": 42,
+    "dedupeKeys": 31
+  },
+  "finished": {
+    "voices": 0,
+    "effectSources": 0,
+    "dedupeKeys": 31
+  },
+  "peak": 0.34099453687667847,
+  "rms": 0.017772382218188318,
+  "nonfinite": 0
+}

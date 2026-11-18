@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "steps": 8,
+  "winner": "blue",
+  "reason": "king",
+  "mode": "ritual",
+  "normalMotion": true,
+  "skippedAction": true,
+  "skippedEnding": true,
+  "testToolsAbsent": true,
+  "realWebGL": true,
+  "errors": []
+}

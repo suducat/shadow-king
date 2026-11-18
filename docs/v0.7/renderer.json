@@ -1,0 +1,268 @@
+{
+  "checks": 101,
+  "actions": 50,
+  "contacts": [
+    {
+      "role": "king",
+      "direction": [
+        0,
+        -1
+      ],
+      "distance": 0.3189958159393522
+    },
+    {
+      "role": "king",
+      "direction": [
+        0,
+        1
+      ],
+      "distance": 0.3189958159393522
+    },
+    {
+      "role": "king",
+      "direction": [
+        -1,
+        0
+      ],
+      "distance": 0.31899581593935245
+    },
+    {
+      "role": "king",
+      "direction": [
+        1,
+        0
+      ],
+      "distance": 0.31899581593935206
+    },
+    {
+      "role": "guard",
+      "direction": [
+        0,
+        -1
+      ],
+      "distance": 0.08298934569866331
+    },
+    {
+      "role": "guard",
+      "direction": [
+        0,
+        1
+      ],
+      "distance": 0.08298934569866336
+    },
+    {
+      "role": "guard",
+      "direction": [
+        -1,
+        0
+      ],
+      "distance": 0.08298934569866365
+    },
+    {
+      "role": "guard",
+      "direction": [
+        1,
+        0
+      ],
+      "distance": 0.08298934569866312
+    },
+    {
+      "role": "martyr",
+      "direction": [
+        0,
+        -1
+      ],
+      "distance": 0.4013626534172635
+    },
+    {
+      "role": "martyr",
+      "direction": [
+        0,
+        1
+      ],
+      "distance": 0.4013626534172635
+    },
+    {
+      "role": "martyr",
+      "direction": [
+        -1,
+        0
+      ],
+      "distance": 0.4013626534172633
+    },
+    {
+      "role": "martyr",
+      "direction": [
+        1,
+        0
+      ],
+      "distance": 0.4013626534172634
+    },
+    {
+      "role": "execution",
+      "direction": [
+        0,
+        -1
+      ],
+      "distance": 0.08012382711853007
+    },
+    {
+      "role": "execution",
+      "direction": [
+        0,
+        -1
+      ],
+      "distance": 0.08012382711853006
+    }
+  ],
+  "privacy": [
+    {
+      "supplied": "king",
+      "actual": "unknown",
+      "duration": 660,
+      "body": [
+        0.01940599107442511,
+        1.5707963267948963,
+        0.011997962458711979,
+        "YXZ"
+      ],
+      "cues": [
+        {
+          "kind": "plant",
+          "at": 0.68
+        },
+        {
+          "kind": "recover",
+          "at": 0.9
+        }
+      ]
+    },
+    {
+      "supplied": "guard",
+      "actual": "unknown",
+      "duration": 660,
+      "body": [
+        0.01940599107442511,
+        1.5707963267948963,
+        0.011997962458711979,
+        "YXZ"
+      ],
+      "cues": [
+        {
+          "kind": "plant",
+          "at": 0.68
+        },
+        {
+          "kind": "recover",
+          "at": 0.9
+        }
+      ]
+    },
+    {
+      "supplied": "martyr",
+      "actual": "unknown",
+      "duration": 660,
+      "body": [
+        0.01940599107442511,
+        1.5707963267948963,
+        0.011997962458711979,
+        "YXZ"
+      ],
+      "cues": [
+        {
+          "kind": "plant",
+          "at": 0.68
+        },
+        {
+          "kind": "recover",
+          "at": 0.9
+        }
+      ]
+    }
+  ],
+  "memory": [
+    {
+      "round": 0,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 1,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 2,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 3,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 4,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 5,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 6,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 7,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 8,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 9,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 10,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 11,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 12,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 13,
+      "geometries": 281,
+      "textures": 5
+    },
+    {
+      "round": 14,
+      "geometries": 301,
+      "textures": 5
+    },
+    {
+      "round": 15,
+      "geometries": 281,
+      "textures": 5
+    }
+  ],
+  "publicDisclosures": 44,
+  "failures": [],
+  "errors": []
+}

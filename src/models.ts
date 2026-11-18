@@ -2,11 +2,12 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { VisibleRole, Side } from './game';
 import {surface} from './surfaces';
+import {type FigurePose} from './battle-timeline';
 import {QUALITY,type Quality} from './quality';
 let detail:Quality='high';const segments=(n:number,min=4)=>Math.max(min,Math.round(n*QUALITY[detail].segments));
 import { bodyPickMesh } from './interaction';
 
-export type CharacterRig = { weapon: T.Group; cape: T.Group; leftArm: T.Group; rightArm: T.Group; seal: T.Group };
+export type CharacterRig = { body:T.Group;leftLeg:T.Group;rightLeg:T.Group;crown:T.Group;weapon: T.Group; cape: T.Group; leftArm: T.Group; rightArm: T.Group; seal: T.Group };
 export type Character = { model: T.Group; pick: T.Mesh; rig: CharacterRig };
 const V = (x:number,y:number,z:number) => new T.Vector3(x,y,z);
 function sculpt(fn:(u:number,v:number)=>T.Vector3, nu=40,nv=24) {
@@ -121,11 +122,11 @@ function crystal(parent:T.Group,p:Palette,y:number,purple=false){
 function royal(model:T.Group,rig:CharacterRig,p:Palette){
   skirt(model,p.cloth,.255,.13,.71,14);cape(rig.cape,p.lining,p.gold,.34,.93);breastplate(model,p,true);face(model,p,1.27);
   // Open-work crown: a sculpted circlet, five fleur-shaped leaves and inset gems.
-  turned(model,p.gold,[[.105,1.36],[.135,1.375],[.132,1.425],[.108,1.43]]);
+  turned(rig.crown,p.gold,[[.105,1.36],[.135,1.375],[.132,1.425],[.108,1.43]]);
   for(let i=0;i<5;i++){
     const a=i*Math.PI*2/5,s=new T.Shape();s.moveTo(-.032,0);s.bezierCurveTo(-.035,.035,-.06,.07,-.019,.097);s.quadraticCurveTo(0,.12,0,.155);s.quadraticCurveTo(0,.12,.019,.097);s.bezierCurveTo(.06,.07,.035,.035,.032,0);s.closePath();
-    const leaf=emboss(model,p.gold,s,.011);leaf.position.set(Math.sin(a)*.124,1.405,Math.cos(a)*.124);leaf.rotation.y=a;
-    ellipsoid(model,p.magic,[Math.sin(a)*.135,1.42,Math.cos(a)*.135],[.018,.025,.015]);
+    const leaf=emboss(rig.crown,p.gold,s,.011);leaf.position.set(Math.sin(a)*.124,1.405,Math.cos(a)*.124);leaf.rotation.y=a;
+    ellipsoid(rig.crown,p.magic,[Math.sin(a)*.135,1.42,Math.cos(a)*.135],[.018,.025,.015]);
   }
   arm(rig.leftArm,p,'royal',true);arm(rig.rightArm,p,'royal',false);
   rig.weapon.position.set(.29,.24,.22);
@@ -137,11 +138,11 @@ function royal(model:T.Group,rig:CharacterRig,p:Palette){
 function knight(model:T.Group,rig:CharacterRig,p:Palette){
   // Two articulated legs establish a recognisable, offset fighting stance.
   for(const s of [-1,1]){
-    const hip=V(s*.095,.77,0),knee=V(s*.13,.49,s<0?.10:-.035),ankle=V(s*.14,.235,s<0?.13:.01);
-    add(model,sweep([hip,knee,ankle],v=>.073-v*.02,14,24),p.steel);
-    ellipsoid(model,p.steel,[knee.x,knee.y,knee.z+.035],[.079,.072,.047]);
-    cord(model,p.gold,[[ankle.x,ankle.y,ankle.z+.055],[knee.x,knee.y-.04,knee.z+.077]],.007);
-    ellipsoid(model,p.shade,[ankle.x,.205,ankle.z+.05],[.076,.045,.125]);
+    const leg=s<0?rig.leftLeg:rig.rightLeg;const hip=V(s*.095,.77,0),knee=V(s*.13,.49,s<0?.10:-.035),ankle=V(s*.14,.235,s<0?.13:.01);
+    add(leg,sweep([hip,knee,ankle],v=>.073-v*.02,14,24),p.steel);
+    ellipsoid(leg,p.steel,[knee.x,knee.y,knee.z+.035],[.079,.072,.047]);
+    cord(leg,p.gold,[[ankle.x,ankle.y,ankle.z+.055],[knee.x,knee.y-.04,knee.z+.077]],.007);
+    ellipsoid(leg,p.shade,[ankle.x,.205,ankle.z+.05],[.076,.045,.125]);
   }
   breastplate(model,p);cape(rig.cape,p.cloth,p.steel,.27,.85);arm(rig.leftArm,p,'knight',true);arm(rig.rightArm,p,'knight',false);
   add(model,sculpt((u,v)=>{const a=u*Math.PI*2,b=v*Math.PI;const front=Math.max(0,Math.cos(a));return V(Math.sin(b)*Math.sin(a)*.13,1.28+Math.cos(b)*.175,Math.sin(b)*Math.cos(a)*.13+front*.018);},32,20),p.steel);
@@ -150,9 +151,9 @@ function knight(model:T.Group,rig:CharacterRig,p:Palette){
   cord(model,p.steel,[[0,1.1,.13],[0,1.31,.16],[0,1.45,.01],[0,1.34,-.13]],.014);
   const crest=add(model,sculpt((u,v)=>V((u-.5)*.021,1.38+Math.sin(v*Math.PI)*.19,-.11+v*.22),6,16),p.lining);crest.rotation.z=-.08;
   rig.weapon.position.set(.19,.72,.25);rig.weapon.rotation.z=-.13;sword(rig.weapon,p);
-  const shield=emboss(model,p.steel,shieldShape(.19,.29),.023);shield.position.set(-.28,.76,.18);shield.rotation.y=-.25;
-  const inset=emboss(model,p.shade,shieldShape(.142,.232),.007);inset.position.set(-.28,.76,.208);inset.rotation.y=-.25;
-  cord(model,p.gold,[[-.28,.87,.223],[-.28,.65,.225],[-.34,.78,.224],[-.22,.78,.224]],.007);
+  const shield=emboss(rig.leftArm,p.steel,shieldShape(.19,.29),.023);shield.position.set(-.28,.76,.18);shield.rotation.y=-.25;
+  const inset=emboss(rig.leftArm,p.shade,shieldShape(.142,.232),.007);inset.position.set(-.28,.76,.208);inset.rotation.y=-.25;
+  cord(rig.leftArm,p.gold,[[-.28,.87,.223],[-.28,.65,.225],[-.34,.78,.224],[-.22,.78,.224]],.007);
 }
 function priest(model:T.Group,rig:CharacterRig,p:Palette){
   skirt(model,p.violet,.275,.13,.78,16);cape(rig.cape,p.cloth,p.gold,.36,1.04);hood(model,p);arm(rig.leftArm,p,'priest',true);arm(rig.rightArm,p,'priest',false);
@@ -174,9 +175,9 @@ function priest(model:T.Group,rig:CharacterRig,p:Palette){
 function sealed(model:T.Group,rig:CharacterRig,p:Palette){
   skirt(model,p.cloth,.26,.14,.84,12);cape(rig.cape,p.cloth,p.steel,.29,1.06);hood(model,p,true);
   for(const s of [-1,1]){add(model,sweep([V(s*.18,1.04,0),V(s*.22,.83,.08),V(s*.11,.75,.18)],v=>.085-v*.025,12,18),p.cloth);}
-  const clasp=emboss(model,p.steel,shieldShape(.105,.13),.015);clasp.position.set(0,.91,.177);
-  crystal(model,p,.9);model.children.at(-1)!.position.z=.207;model.children.at(-1)!.scale.set(.38,.38,.38);
-  cord(model,p.steel,[[-.12,1.09,.11],[0,.98,.18],[.12,1.09,.11]],.008);
+  const clasp=emboss(rig.seal,p.steel,shieldShape(.105,.13),.015);clasp.position.set(0,.91,.177);
+  crystal(rig.seal,p,.9);rig.seal.children.at(-1)!.position.z=.207;rig.seal.children.at(-1)!.scale.set(.38,.38,.38);
+  cord(rig.seal,p.steel,[[-.12,1.09,.11],[0,.98,.18],[.12,1.09,.11]],.008);
 }
 function batch(group:T.Group){
   for(const c of [...group.children])if(c instanceof T.Group)batch(c);
@@ -191,13 +192,17 @@ function batch(group:T.Group){
   }
 }
 function buildCharacter(role:VisibleRole,side:Side):Character {
-  const model=new T.Group(),p=palette(side),rig:CharacterRig={weapon:new T.Group(),cape:new T.Group(),leftArm:new T.Group(),rightArm:new T.Group(),seal:new T.Group()};
-  for(const [name,part] of Object.entries(rig)){part.name=`rig-${name}`;model.add(part);}
-  base(model,p,role);
-  if(role==='king')royal(model,rig,p);else if(role==='guard')knight(model,rig,p);else if(role==='martyr')priest(model,rig,p);else sealed(model,rig,p);
-  for(const [part,pivot] of [[rig.leftArm,V(-.19,1.07,0)],[rig.rightArm,V(.19,1.07,0)],[rig.cape,V(0,1.11,-.06)]] as const){
-    for(const child of part.children)child.position.sub(pivot);part.position.copy(pivot);
-  }
+  const model=new T.Group(),body=new T.Group(),p=palette(side),rig:CharacterRig={body,leftLeg:new T.Group(),rightLeg:new T.Group(),crown:new T.Group(),weapon:new T.Group(),cape:new T.Group(),leftArm:new T.Group(),rightArm:new T.Group(),seal:new T.Group()};
+  for(const [name,part]of Object.entries(rig)){part.name=`rig-${name}`;if(part!==body)body.add(part);}model.add(body);base(model,p,role);
+  if(role==='king')royal(body,rig,p);else if(role==='guard')knight(body,rig,p);else if(role==='martyr')priest(body,rig,p);else sealed(body,rig,p);
+  const pivots:[T.Group,T.Vector3][]=[[rig.leftArm,V(-.19,1.07,0)],[rig.rightArm,V(.19,1.07,0)],[rig.cape,V(0,1.11,-.06)],[rig.leftLeg,V(-.095,.77,0)],[rig.rightLeg,V(.095,.77,0)],[rig.crown,V(0,1.4,0)]];
+  if(role==='unknown')pivots.push([rig.seal,V(0,.95,.2)]);
+  for(const[part,pivot]of pivots){for(const child of part.children)child.position.sub(pivot);part.position.copy(pivot);}
+  if(role==='king'){for(const c of rig.weapon.children)c.position.y-=.48;rig.weapon.position.set(.21,.72,.23);}
+  for(const child of body.children)child.position.y-=.78;body.position.y=.78;body.rotation.order='YXZ';
+  model.updateMatrixWorld(true);if(role==='guard'||role==='king')rig.rightArm.attach(rig.weapon);
+  rig.weapon.userData.contact=role==='guard'?[0,.29,0]:role==='king'?[0,.64,0]:[0,.08,.06];
+  for(const part of Object.values(rig)){part.userData.bindPosition=part.position.toArray();part.userData.bindRotation=part.rotation.toArray();}
   batch(model);
   // A uniform scale keeps all base positions and visual footprints tied to one cell.
   model.rotation.y=role==='unknown'?(side==='red'?Math.PI:0):(side==='red'?0:Math.PI);
@@ -216,12 +221,13 @@ export function createCharacter(role:VisibleRole,side:Side,quality:Quality='high
     source.model.traverse(o=>{if(o instanceof T.Mesh){o.geometry.userData.shared=true;for(const m of (Array.isArray(o.material)?o.material:[o.material])){m.userData.shared=true;for(const v of Object.values(m))if(v instanceof T.Texture)v.userData.shared=true;}}});
     templates.set(key,source);
   }
-  const model=source.model.clone(true),rig:CharacterRig={weapon:model.getObjectByName('rig-weapon') as T.Group,cape:model.getObjectByName('rig-cape') as T.Group,leftArm:model.getObjectByName('rig-leftArm') as T.Group,rightArm:model.getObjectByName('rig-rightArm') as T.Group,seal:model.getObjectByName('rig-seal') as T.Group};
+  const model=source.model.clone(true),part=(name:string)=>model.getObjectByName('rig-'+name) as T.Group,rig:CharacterRig={body:part('body'),leftLeg:part('leftLeg'),rightLeg:part('rightLeg'),crown:part('crown'),weapon:part('weapon'),cape:part('cape'),leftArm:part('leftArm'),rightArm:part('rightArm'),seal:part('seal')};
   // Geometry/textures are immutable and cached. Opacity and other material
   // properties belong to ONE actor, including after a perspective replacement.
-  const materials=new Map<T.Material,T.Material>();
+  const materials=new Map<string,T.Material>();
   model.traverse(o=>{if(o instanceof T.Mesh){
-    const clone=(source:T.Material)=>{let own=materials.get(source);if(!own){own=source.clone();own.userData={...source.userData,shared:false};if(import.meta.env.DEV||import.meta.env.MODE==='test')own.addEventListener('dispose',()=>{own!.userData.released=true;});materials.set(source,own);}return own;};
+    let scope='base';for(let p:T.Object3D|null=o.parent;p&&p!==model;p=p.parent){if(p.name==='rig-crown'){scope='crown';break;}if(p.name==='rig-body')scope='body';}
+    const clone=(source:T.Material)=>{const key=source.uuid+'/'+scope;let own=materials.get(key);if(!own){own=source.clone();own.userData={...source.userData,shared:false,scope};if(import.meta.env.DEV||import.meta.env.MODE==='test')own.addEventListener('dispose',()=>{own!.userData.released=true;});materials.set(key,own);}return own;};
     o.material=Array.isArray(o.material)?o.material.map(clone):clone(o.material);
   }});
   return {model,rig,pick:bodyPickMesh(role)};
@@ -230,4 +236,14 @@ export function disposeCharacters(){
   const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>(),textures=new Set<T.Texture>();
   for(const {model,pick} of templates.values())for(const object of [model,pick])object.traverse(o=>{if(o instanceof T.Mesh){geometries.add(o.geometry);for(const m of (Array.isArray(o.material)?o.material:[o.material])){materials.add(m);for(const v of Object.values(m))if(v instanceof T.Texture)textures.add(v);}}});
   geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());templates.clear();
+}
+
+// Absolute local poses, never additive mutations: skipped/late frames and
+// interrupted actions cannot leave a scale, wrist rotation or cloak drift.
+export function poseFigure(rig:CharacterRig,p:FigurePose,yaw=0){
+ for(const part of Object.values(rig)){part.position.fromArray(part.userData.bindPosition);part.rotation.fromArray(part.userData.bindRotation);part.scale.setScalar(1);}
+ rig.body.position.y+=p.heave;rig.body.position.x+=Math.sin(yaw)*p.sway;rig.body.position.z+=Math.cos(yaw)*p.sway;rig.body.rotation.set(p.lean,yaw,p.roll,'YXZ');
+ rig.weapon.rotation.x+=p.weaponPitch;rig.weapon.rotation.z+=p.weaponRoll;rig.cape.rotation.x+=p.capeDrag;
+ rig.leftArm.rotation.x+=p.leftArm;rig.rightArm.rotation.x+=p.rightArm;rig.leftLeg.rotation.x+=p.leftLeg;rig.rightLeg.rotation.x+=p.rightLeg;
+ rig.seal.scale.setScalar(p.sealScale);rig.seal.position.y+=p.sealLift;rig.crown.position.y+=p.crownLift;rig.crown.rotation.z+=p.crownRoll;
 }

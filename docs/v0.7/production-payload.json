@@ -1,0 +1,32 @@
+[
+  {
+    "stage": "before",
+    "assets": [
+      {
+        "file": "index-_fPaWWiD.css",
+        "raw": 71011,
+        "gzip": 16729
+      },
+      {
+        "file": "index-eCtsrqZt.js",
+        "raw": 904860,
+        "gzip": 256829
+      }
+    ]
+  },
+  {
+    "stage": "after",
+    "assets": [
+      {
+        "file": "index-BUH5uKbT.css",
+        "raw": 74827,
+        "gzip": 17574
+      },
+      {
+        "file": "index-DaPkV7Rq.js",
+        "raw": 920789,
+        "gzip": 262785
+      }
+    ]
+  }
+]
