@@ -2,6 +2,7 @@ import * as T from 'three';
 const basic=(color:number,opacity:number)=>new T.MeshBasicMaterial({color,opacity,transparent:true,depthWrite:false});
 // Fixed buffers keep selecting/deselecting out of the geometry/material allocator.
 export class BoardMarks{
+ private landing:T.Mesh<T.RingGeometry,T.MeshBasicMaterial>;
  private selected:T.Mesh;private tint:T.InstancedMesh;private moveRing:T.InstancedMesh;private attackRing:T.InstancedMesh;private dots:T.InstancedMesh;private crosses:T.LineSegments;private matrix=new T.Matrix4();private rotation=new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0),-Math.PI/2);
  constructor(readonly group:T.Group){
   this.selected=new T.Mesh(new T.PlaneGeometry(.94,.94),basic(0xe2bc70,.23));this.selected.rotation.x=-Math.PI/2;group.add(this.selected);this.selected.visible=false;
@@ -9,7 +10,20 @@ export class BoardMarks{
   this.tint=pool(new T.PlaneGeometry(.9,.9),basic(0xffffff,.18));for(let i=0;i<49;i++)this.tint.setColorAt(i,new T.Color(0xffffff));this.tint.instanceColor!.setUsage(T.DynamicDrawUsage);
   this.moveRing=pool(new T.RingGeometry(.25,.262,40),basic(0xdbc58b,.95));this.attackRing=pool(new T.RingGeometry(.42,.432,48),basic(0xea956b,.95));this.dots=pool(new T.CircleGeometry(.06,16),basic(0xf0d49a,.85));
   const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(new Float32Array(49*12),3).setUsage(T.DynamicDrawUsage));geometry.setDrawRange(0,0);this.crosses=new T.LineSegments(geometry,new T.LineBasicMaterial({color:0xffb095,transparent:true,opacity:.95}));this.crosses.frustumCulled=false;group.add(this.crosses);
+  this.landing=new T.Mesh(new T.RingGeometry(.412,.454,48),basic(0xf0d49a,.85));
+  this.landing.rotation.x=-Math.PI/2;this.landing.visible=false;group.add(this.landing);
  }
+ landAt(x:number,y:number,occupied:boolean){
+  this.landing.position.set(x-3,.17,y-3);
+  this.landing.material.color.setHex(occupied?0xffab81:0xf0d49a);
+  this.landing.material.opacity=.78;this.landing.scale.setScalar(1);this.landing.visible=true;
+ }
+ setLandingContact(t:number,plant:number,reduced:boolean){
+  const settle=T.MathUtils.clamp((t-plant)/(1-plant),0,1);
+  this.landing.scale.setScalar(reduced?1:1+.16*Math.sin(Math.PI*settle));
+  this.landing.material.opacity=t<plant?.78:1-.32*settle;
+ }
+ clearLanding(){this.landing.visible=false;}
  update(selected:{x:number;y:number}|undefined,legal:{x:number;y:number;occupied:boolean}[]){
   this.selected.visible=!!selected;if(selected)this.selected.position.set(selected.x-3,.145,selected.y-3);
   this.tint.count=this.moveRing.count=this.attackRing.count=this.dots.count=0;let vertices=0;

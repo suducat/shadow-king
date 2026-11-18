@@ -1,5 +1,5 @@
 import type {VisibleRole} from './game';
-export type CueOptions={key?:string;group?:string;reduced?:boolean;material?:VisibleRole;index?:number};
+export type CueOptions={key?:string;group?:string;decisive?:boolean;reduced?:boolean;material?:VisibleRole;index?:number};
 export type AudioLayer={noise?:boolean;frequency:number;end?:number;duration:number;delay?:number;gain:number;type?:OscillatorType;filter?:number;pan?:number};
 const tone=(frequency:number,duration:number,gain:number,end=frequency,type:OscillatorType='sine',delay=0):AudioLayer=>({frequency,end,duration,gain,type,delay});
 const grain=(frequency:number,duration:number,gain:number):AudioLayer=>({noise:true,frequency,duration,gain});
@@ -32,9 +32,10 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
   if(role==='guard')layers.push(tone(890,.25,.08,840),tone(1174,.17,.035));
   if(role==='king')layers.push(tone(294,.36,.08),tone(440,.25,.045));
   if(role==='martyr')layers.push(tone(261,.32,.09),tone(392,.4,.05,294));
+  if(options.decisive)layers.push(tone(49,.24,.095,36));
   return layers;
  }
- if(stage==='plant')return role==='martyr'?[grain(420,.085,.09),tone(174.61,.13,.045)]:[tone(role==='king'?64:82,.105,role==='king'?.17:.13,48),grain(330,.075,.08)];
+ if(stage==='plant')return[grain(1450,.032,.14),tone(role==='king'?79:102,.10,.14,51),grain(285,.085,.08)];
  if(stage==='charged')return[tone(294,.3,.09,588),tone(880,.24,.04,660)];
  if(stage==='recover')return[tone(role==='guard'?440:196,.16,.025,146.83)];
  return[tone(146.83,.15,.055)];

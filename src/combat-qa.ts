@@ -3,7 +3,7 @@ import type {BoardScene} from './scene';
 import {fixture} from './qa';
 import {ritualFixture} from './ritual-qa';
 import {act,viewFor,type Game,type VisibleRole} from './game';
-import {publicBeats} from './battle-timeline';
+import {disclosureDelay,publicBeats} from './battle-timeline';
 import {modelState} from './lifecycle-qa';
 export function combatFrame(scene:BoardScene){
  const tr=scene.transition;
@@ -28,8 +28,12 @@ export async function combatProbe(scene:BoardScene){
   const p=scene.animatePath(a.id,role,steps,false,false,{publicBeats:publicBeats(next,g.captures.length,steps)});update(next);const tr=scene.transition!;
   step(.2);const before=modelState(scene).find(s=>s.id===v.id)!;check(before.zeroOpacity===0&&before.visible,`victim before contact ${role}/${dx}/${dy}`);
   step(.58);const actor=tr.actor;actor.group.updateMatrixWorld(true);const tip=actor.rig!.weapon.localToWorld(new T.Vector3().fromArray(actor.rig!.weapon.userData.contact));
-  const target=new T.Vector3(3+dx-3,1.1,3+dy-3),distance=Math.hypot(tip.x-target.x,tip.z-target.z);contacts.push({role,direction:[dx,dy],distance});if(role==='guard')check(distance<.28,`guard blade contact ${distance}`);
+  const target=new T.Vector3(3+dx-3,1.1,3+dy-3),distance=Math.hypot(tip.x-target.x,tip.z-target.z);contacts.push({role,direction:[dx,dy],distance});if(role==='guard'||role==='king')check(distance<.28,`guard blade contact ${distance}`);
   const body=actor.rig!.body.rotation.clone();step(.58+tr.line.hold*.7);check(Math.abs(actor.rig!.body.rotation.x-body.x)+Math.abs(actor.rig!.body.rotation.y-body.y)+Math.abs(actor.rig!.body.rotation.z-body.z)<1e-9,`contact hold ${role}`);
+  const victim=tr.victims[0];
+  check(victim.actor.role==='unknown'&&!victim.disclosed&&victim.actor.group.position.distanceTo(victim.at)>.005,`sealed recoil before disclosure ${role}/${dx}/${dy}`);
+  step(.58+disclosureDelay(tr.duration)+.001);
+  check(victim.disclosed&&victim.actor.role===v.role&&!victim.actor.disposed,`public model after recoil ${role}/${dx}/${dy}`);
   step(1.1);await p;actions++;check(healthy()&&!scene.actors.has(v.id),`capture settled ${role}`);
  }
  for(const role of ['king','guard','martyr'] as const){

@@ -20,3 +20,12 @@ test('100 selection changes reuse highlight buffers and encode attack/move shape
  const group=new T.Group(),marks=new BoardMarks(group),geometries=group.children.map(c=>(c as T.Mesh).geometry);for(let i=0;i<100;i++)marks.update({x:3,y:3},[{x:3,y:2,occupied:true},{x:4,y:3,occupied:false}]);assert.deepEqual(group.children.map(c=>(c as T.Mesh).geometry),geometries);assert.equal((group.children[1] as T.InstancedMesh).count,2);assert.equal((group.children[2] as T.InstancedMesh).count,1);assert.equal((group.children[3] as T.InstancedMesh).count,1);marks.update(undefined,[]);assert.equal(group.children[0].visible,false);assert.equal((group.children[1] as T.InstancedMesh).count,0);
 });
 test('hidden groups are never resurrected by batching',()=>{const{parent,actors}=world(),b=new RigidBatches(parent);actors[0].model.visible=false;b.sync(actors);assert.equal(b.stats.parts,6);assert.ok(!b.stats.instances.includes('0'));b.clear();});
+test('committed landing stays marked when selection clears and releases on cancellation',()=>{
+ const group=new T.Group(),marks=new BoardMarks(group);
+ marks.landAt(4,3,false);marks.update(undefined,[]);
+ const landing=group.children.at(-1)!;
+ assert.deepEqual(landing.position.toArray(),[1,.17,0]);
+ marks.setLandingContact(.8,.8,true);
+ assert.ok(landing.visible);assert.equal(landing.scale.x,1);
+ marks.clearLanding();assert.equal(landing.visible,false);
+});

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>暗王 · 棋子动作对照</title>
+<style>
+:root{color-scheme:dark;background:#101718;color:#eee6d7;font:16px/1.6 system-ui,sans-serif}
+body{max-width:1000px;margin:auto;padding:24px clamp(14px,4vw,48px) 64px}a{color:#ebcd90}h1,h2{font-family:serif}h1{margin-bottom:.3em}p{margin:.4em 0 1em}
+section{padding:1.4em 0;border-top:1px solid #675d4a}h2{margin:.1em 0}.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}figure{margin:0}figcaption{color:#ddcba8}video{width:100%;background:#080d0e;display:block}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:.7em 0}button{padding:8px 14px;min-height:44px;background:#252e30;color:inherit;border:1px solid #877451;border-radius:4px}button:focus-visible,a:focus-visible{outline:2px solid white}input{flex:1;min-width:110px;accent-color:#d1b273}output{font-variant-numeric:tabular-nums}small{color:#bcbdba}
+@media(max-width:600px){.pair{grid-template-columns:1fr}video{max-height:27vh}body{padding-top:12px}}
+</style>
+<main><a href="../../">返回棋局</a><h1>棋子动作对照</h1>
+<p>同一局面、红方视角、固定镜头。逐帧影片从 F0 开始，每帧间隔 1/30 秒。可以同步慢放，或拖动时间条检查剑刃和底座。</p>
+<p><small>逐帧影片由 Chromium 在指定动作时刻绘制，无声。每组下方另附实时时钟录屏，含游戏原声。录制环境使用软件 WebGL，实时画面会丢帧。</small></p>
+</main>
+<script>
+const scenes=[
+ ['move','普通落子',17,'底座起步均在 F3。旧版 F12 触发石面声，F15 到格。新版 F14 到格、触地并触发石面声。',[3,12,14,15]],
+ ['capture','普通吃子',26,'旧版 F5 起步；新版蓄势到 F8 才前移。均在 F16 命中、F24 到格。旧版 F16 显露真身，新版保留封印受力，到 F18 揭示。',[8,16,17,18,24]],
+ ['execution','双目标斩杀',43,'两版均在 F8 起步、F19 与 F33 分别命中、F37 落定。新版每次命中后才揭示对应目标。',[8,19,21,33,35,37]]
+];
+for(const [name,title,last,description,beats] of scenes){
+ const section=document.createElement('section');section.id=name;
+ section.innerHTML='<h2>'+title+'</h2><p>'+description+'</p><div class="pair"></div><div class="controls"><button type="button">同步慢放</button><input type="range" min="0" max="'+last+'" value="0" aria-label="'+title+'对照帧"><output>F0</output></div><div class="controls beats"></div><p class="live">实时原声　</p>';
+ document.querySelector('main').append(section);
+ const videos=[];
+ for(const [stage,label] of [['before','修改前'],['after','修改后']]){
+  const fig=document.createElement('figure');fig.innerHTML='<figcaption>'+label+'</figcaption><video playsinline muted preload="metadata" src="'+name+'-'+stage+'.mp4#t=0.001"></video>';section.querySelector('.pair').append(fig);videos.push(fig.querySelector('video'));
+  const link=document.createElement('a');link.href=name+'-'+stage+'-live.webm';link.textContent=label;section.querySelector('.live').append(link,'　');
+ }
+ const input=section.querySelector('input'),output=section.querySelector('output'),play=section.querySelector('button');
+ let playing=false,timer=0;
+ function seek(frame){input.value=frame;output.value='F'+frame;for(const video of videos)video.currentTime=(frame+.12)/30;}
+ function stop(){playing=false;clearInterval(timer);play.textContent='同步慢放';}
+ input.oninput=()=>{stop();seek(+input.value);};
+ for(const frame of beats){const b=document.createElement('button');b.textContent='F'+frame;b.onclick=()=>{stop();seek(frame);};section.querySelector('.beats').append(b);}
+ play.onclick=()=>{if(playing){stop();return;}if(+input.value===last)seek(0);playing=true;play.textContent='暂停';timer=setInterval(()=>{if(+input.value>=last){stop();return;}seek(+input.value+1);},100);};
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+}
+</script></html>

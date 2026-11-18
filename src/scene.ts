@@ -5,7 +5,7 @@ import {RigidBatches} from './rigid-batches';
 import {renderResolution} from './render-resolution';
 import {surface,disposeSurfaces,setSurfaceSampling} from './surfaces';
 import {BattleEffects} from './battle-effects';
-import {battleTimeline,consumeCues,sampleBattle,retirementPose,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
+import {battleTimeline,consumeCues,sampleBattle,retirementPose,disclosureDelay,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
 import type {CueOptions} from './audio';
 import type { Side, VisiblePiece, VisibleRole,Capture } from './game';
 import {type GameMode,type Rites,type ActionStep} from './ritual';
@@ -48,7 +48,7 @@ function makeActor(p: VisiblePiece,quality:Quality): Actor {
 }
 
 type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean};
-type Motion={id:string;victimId?:string;role:VisibleRole;actor:Actor;victim?:Actor;victims:Victim[];steps:ActionStep[];execution:boolean;cues:BattleCue[];emitted:Set<number>;silent:boolean;impacts:Set<number>;restore:()=>void;from:T.Vector3;to:T.Vector3;start:number;duration:number;impact:boolean;finish:(completed:boolean)=>void;line:Timeline;publicBeats:PublicBeats;pendingState?:SceneState;beforeRites?:Rites;beforePieces:VisiblePiece[];ceremonyCommitted:boolean;lastProgress:number;fromFacing:number;goalFacing:number;groupKey:string};
+type Motion={id:string;victimId?:string;role:VisibleRole;actor:Actor;victim?:Actor;victims:Victim[];steps:ActionStep[];execution:boolean;cues:BattleCue[];emitted:Set<number>;silent:boolean;impacts:Set<number>;restore:()=>void;from:T.Vector3;to:T.Vector3;start:number;duration:number;impact:boolean;finish:(completed:boolean)=>void;line:Timeline;publicBeats:PublicBeats;pendingState?:SceneState;beforeRites?:Rites;beforePieces:VisiblePiece[];ceremonyCommitted:boolean;lastProgress:number;fromFacing:number;goalFacing:number;groupKey:string;startLift:number};
 let sceneSerial=0;
 const shortAngle=(angle:number)=>Math.atan2(Math.sin(angle),Math.cos(angle));
 export class BoardScene {
@@ -72,6 +72,7 @@ export class BoardScene {
   frame = 0;
   renderedFrames = 0;
   fx:BattleEffects;
+  onBoardContact:((actor:string,step:ActionStep,rites:Rites|undefined,reveals:PublicBeats['reveals'])=>void)|null=null;
   onBattleCue:((kind:string,options?:CueOptions)=>void)|null=null;
   onBattleCancel:((group:string)=>void)|null=null;onPublicCapture:((capture:Capture)=>void)|null=null;
   lastSkipped=false;private instance=++sceneSerial;private actionSerial=0;private ceremonySerial=0;private audioQueue:{kind:string;options:CueOptions;at:number}[]=[];private cameraImpulse:{at:number;direction:T.Vector3}|null=null;private cameraBase=new T.Vector3();
@@ -279,13 +280,14 @@ export class BoardScene {
     const victims=steps.flatMap((step,index)=>{const a=step.victimId?this.actors.get(step.victimId):undefined;return a?[{id:step.victimId!,actor:a,index,at:a.group.position.clone(),disclosed:false}]:[];});
     const victimId=victims[0]?.id,to=steps.at(-1)!,line=battleTimeline(role,steps.length,execution,!!victimId,!!options.charge,reduced),from=actor.group.position.clone(),destination=cellToWorld(to.x,to.y,.18),dir=destination.clone().sub(from).setY(0);
     const goalFacing=dir.lengthSq()>.001?shortAngle(Math.atan2(dir.x,dir.z)-actor.model.rotation.y):actor.facing;
+    this.boardMarks.landAt(to.x,to.y,!!to.victimId);
     if(execution)this.fx.startAction(from,steps,role);else if(victimId)this.fx.startStrike(role,from,steps);else if(role==='martyr'&&!reduced)this.fx.startMartyrTrail(from,steps);
     this.lastAttack=victimId||execution?{role,victimId,dissolved:false,execution,path:steps.map(p=>({...p}))}:null;
-    return new Promise(finish=>{this.transition={id,role,actor,victim:victims[0]?.actor,victimId,victims,steps:steps.map(p=>({...p})),execution,cues:line.cues,emitted:new Set(),silent:false,impacts:new Set(),restore:actor.rest,from,to:destination,start:performance.now(),duration:line.duration,impact:false,finish,line,publicBeats:options.publicBeats??{captures:[],reveals:[]},beforeRites:this.state.ritual?structuredClone(this.state.ritual):undefined,beforePieces:structuredClone(this.state.pieces),ceremonyCommitted:false,lastProgress:0,fromFacing:actor.facing,goalFacing,groupKey:`battle/${this.instance}/${++this.actionSerial}`};});
+    return new Promise(finish=>{this.transition={id,role,actor,victim:victims[0]?.actor,victimId,victims,steps:steps.map(p=>({...p})),execution,cues:line.cues,emitted:new Set(),silent:false,impacts:new Set(),restore:actor.rest,from,to:destination,start:performance.now(),duration:line.duration,impact:false,finish,line,publicBeats:options.publicBeats??{captures:[],reveals:[]},beforeRites:this.state.ritual?structuredClone(this.state.ritual):undefined,beforePieces:structuredClone(this.state.pieces),ceremonyCommitted:false,lastProgress:0,startLift:actor.model.position.y,fromFacing:actor.facing,goalFacing,groupKey:`battle/${this.instance}/${++this.actionSerial}`};});
   }
   cancelMove(completed=false){
     const tr=this.transition;this.transition=null;if(!tr)return;
-    tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
+    this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
     for(const v of tr.victims)this.removeActor(v.id,v.actor);
     if(!completed||tr.silent){this.audioQueue=this.audioQueue.filter(c=>c.options.group!==tr.groupKey);this.onBattleCancel?.(tr.groupKey);}
     this.fx.clearAction();this.clearCameraImpulse();tr.finish(completed);
@@ -296,30 +298,55 @@ export class BoardScene {
     if(this.actors.get(tr.id)!==tr.actor){this.cancelMove();return;}
     const progress=Math.max(tr.lastProgress,clamp((now-tr.start)/tr.duration));tr.lastProgress=progress;
     const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,step=tr.steps[index],from=index?cellToWorld(tr.steps[index-1].x,tr.steps[index-1].y,.18):tr.from,to=cellToWorld(step.x,step.y,.18),dir=to.clone().sub(from).setY(0).normalize(),actor=tr.actor;
-    actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=0;actor.model.rotation.z=0;
+    actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=sample.lift+tr.startLift*(1-smooth(progress/.28));
+    actor.model.rotation.z=0;
+    this.boardMarks.setLandingContact(progress,tr.line.plant,tr.line.reduced);
     if(actor.rig){const turn=tr.line.reduced?1:smooth(clamp(progress/.26));poseFigure(actor.rig,sample.pose,tr.fromFacing+shortAngle(tr.goalFacing-tr.fromFacing)*turn);}
     actor.group.updateMatrixWorld(true);const tip=actor.rig?actor.rig.weapon.localToWorld(new T.Vector3().fromArray(actor.rig.weapon.userData.contact??[0,.3,0])):actor.group.position.clone();
-    this.fx.stepAction(progress,actor.group.position,Math.sign(dir.z),tip,index,sample.local,tr.line.reduced);
+    const edge=actor.rig&&(tr.role==='guard'||tr.role==='king')
+      ? actor.rig.weapon.localToWorld(new T.Vector3().fromArray(actor.rig.weapon.userData.trailEdge)) : undefined;
+    this.fx.stepAction(progress,actor.group.position,Math.sign(dir.z),tip,index,sample.local,tr.line.reduced,edge,now);
     for(const{cue,index:cueIndex}of consumeCues(tr.cues,tr.emitted,progress)){
       const at=tr.start+cue.at*tr.duration,age=now-at,fresh=age<160&&!document.hidden&&!tr.silent;
       if(import.meta.env.MODE==='test')this.cueLog.push({id:tr.id,kind:cue.kind,index:cue.index});
       let material:VisibleRole='unknown';
+      if(cue.kind==='disclose'){
+        const beat=tr.publicBeats.captures.find(c=>c.step===cue.index);
+        const victim=tr.victims.find(v=>v.index===cue.index);
+        if(beat&&victim&&!victim.disclosed){
+          victim.disclosed=true;
+          if(!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
+          if(!tr.silent)this.onPublicCapture?.(beat.capture);
+        }
+        continue;
+      }
       if(cue.kind==='impact'){
         const i=cue.index!,hit=tr.steps[i];tr.impacts.add(i);tr.impact=true;
-        const disclosed=tr.publicBeats.captures.find(c=>c.step===i);const victim=tr.victims.find(v=>v.index===i);
-        if(disclosed&&victim){victim.disclosed=true;if(fresh&&victim.actor.role!==disclosed.capture.role)this.revealActor(victim.id,disclosed.capture.role);if(fresh)this.onPublicCapture?.(disclosed.capture);}
-        if(fresh)for(const reveal of tr.publicBeats.reveals.filter(r=>r.step===i))this.revealActor(reveal.id,reveal.role);
-        if(tr.publicBeats.reveals.some(r=>r.step===i))tr.ceremonyCommitted=true;
-        if(tr.pendingState)this.syncEffects(tr.pendingState,tr.ceremonyCommitted?tr.pendingState.ritual:tr.beforeRites,now);
-        material=victim?.actor.role??'unknown';
-        if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,material);if(!tr.line.reduced&&this.state.cinematic)this.cameraImpulse={at:now,direction:dir.clone()};}
+        const victim=tr.victims.find(v=>v.index===i);
+        if(!victim)continue;
+        const reveals=tr.publicBeats.reveals.filter(r=>r.step===i);
+        for(const reveal of reveals)this.revealActor(reveal.id,reveal.role);
+        if(reveals.length)tr.ceremonyCommitted=true;
+        const rites=tr.ceremonyCommitted?tr.pendingState?.ritual:tr.beforeRites;
+        if(tr.pendingState)this.syncEffects(tr.pendingState,rites,now);
+        if(!tr.silent)this.onBoardContact?.(tr.id,hit,rites,reveals);
+        material=victim.actor.role;
+        if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,material);if(!tr.line.reduced&&this.state.cinematic&&(tr.execution||tr.publicBeats.decisive===i))this.cameraImpulse={at,direction:dir.clone()};}
       }
       if(cue.kind==='recover'&&tr.pendingState&&!tr.ceremonyCommitted){tr.ceremonyCommitted=true;this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);}
-      if(fresh){const kind=tr.execution&&tr.role!=='unknown'?`execution-${cue.kind}`:`battle-${tr.role}-${cue.kind}`;this.audioQueue.push({kind,options:{key:`${tr.groupKey}/${cueIndex}`,group:tr.groupKey,reduced:tr.line.reduced,material},at});}
+      if(fresh){const kind=tr.execution&&tr.role!=='unknown'?`execution-${cue.kind}`:`battle-${tr.role}-${cue.kind}`;this.audioQueue.push({kind,options:{key:`${tr.groupKey}/${cueIndex}`,group:tr.groupKey,reduced:tr.line.reduced,material,decisive:cue.kind==='impact'&&tr.publicBeats.decisive===cue.index},at});}
     }
     for(const v of tr.victims){if(v.actor.disposed)continue;const hit=tr.line.contacts[v.index]??.58;if(progress<hit)continue;
-      const end=Math.min(.97,hit+(tr.execution?.22:.36)),age=clamp((progress-hit-tr.line.hold)/(end-hit-tr.line.hold));if(age>=.98){this.removeActor(v.id,v.actor);continue;}
-      v.actor.group.position.copy(v.at).addScaledVector(dir,Math.sin(Math.min(1,age/.3)*Math.PI)*.025);if(v.actor.rig)poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
+      const discloseAt=hit+disclosureDelay(tr.duration);
+      const end=Math.min(.98,hit+(tr.execution?.24:.39));
+      const age=smooth(clamp((progress-discloseAt)/(end-discloseAt)));
+      if(age>=.999){this.removeActor(v.id,v.actor);continue;}
+      const sinceHit=(progress-hit)*tr.duration;
+      const kick=tr.line.reduced?0:smooth(sinceHit/45)*(1-smooth((sinceHit-45)/180));
+      v.actor.group.position.copy(v.at).addScaledVector(dir,.12*kick);
+      v.actor.group.rotation.set(dir.z*.13*kick,0,-dir.x*.13*kick);
+      if(v.actor.rig)poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
+      if(progress<discloseAt)continue;
       (v.actor.rune.material as T.MeshBasicMaterial).opacity=.25*(1-age);
       v.actor.model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}const start=m.userData.scope==='base'?.68:m.userData.scope==='crown'?.35:.18;m.opacity=1-smooth(clamp((age-start)/(.98-start)));}});
     }
@@ -408,17 +435,19 @@ export class BoardScene {
       }
     }
     this.cameraBase.copy(this.camera.position);
-    if(this.cameraImpulse&&this.state.cinematic&&!this.state.reduced){const t=(now-this.cameraImpulse.at)/180;if(t>=1)this.cameraImpulse=null;else{this.camera.position.addScaledVector(this.cameraImpulse.direction,-.018*Math.sin(t*Math.PI)*(1-t));this.camera.lookAt(0,-.05,0);}}
+
     for (const [id, actor] of this.actors) {
       const piece=this.state.pieces.find(p=>p.id===id);
       if(actor.revealStarted&&now-actor.revealStarted>700)actor.revealStarted=undefined;
       if(this.transition?.id===id||this.transition?.victims.some(v=>v.id===id))continue;
-      actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));actor.model.position.y=0;
+      actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&this.state.selected===id ? .032 : 0;
+      actor.model.position.y=T.MathUtils.damp(actor.model.position.y,selectedLift,22,dt);
       if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(actor.rig,pose,actor.facing);}
       actor.rune.rotation.z += this.state.reduced ? 0 : dt * .12;
     }
     const actionTime=import.meta.env.MODE==='test'&&this.debugActionProgress!==null&&this.transition?this.transition.start+this.transition.duration*this.debugActionProgress:now;
     this.stepMove(actionTime);
+    if(this.cameraImpulse&&this.state.cinematic&&!this.state.reduced){const t=(actionTime-this.cameraImpulse.at)/180;if(t>=1)this.cameraImpulse=null;else{this.camera.position.addScaledVector(this.cameraImpulse.direction,-.018*Math.sin(t*Math.PI)*(1-t));this.camera.lookAt(0,-.05,0);}}
     this.fx.tick(actionTime,this.state.reduced,this.actors);
     if (this.burst) {
       const age = (now - this.burst.start) / 1000;

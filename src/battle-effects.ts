@@ -62,7 +62,13 @@ export class BattleEffects{
  startMartyrTrail(from:T.Vector3,steps:ActionStep[]){this.clearAction();const g=new T.Group();g.userData.martyr=true;this.root.add(g);this.action=g;const to=cellToWorld(steps.at(-1)!.x,steps.at(-1)!.y);for(let i=0;i<3;i++){const m=ring(g,.18,.012,PURPLE,.1,.16);m.position.x=T.MathUtils.lerp(from.x,to.x,i/3);m.position.z=T.MathUtils.lerp(from.z,to.z,i/3);}}
  startStrike(role:VisibleRole,from:T.Vector3,steps:ActionStep[]){
   this.clearAction();const g=new T.Group();g.userData.steps=steps.map(s=>({...s}));g.userData.role=role;g.userData.strike=true;g.userData.points=[];g.userData.to=cellToWorld(steps.at(-1)!.x,steps.at(-1)!.y,1.03);this.root.add(g);this.action=g;
-  const line=new T.Line(new T.BufferGeometry().setAttribute('position',new T.BufferAttribute(new Float32Array(24),3)),new T.LineBasicMaterial({color:tint(role),transparent:true,opacity:.5,depthWrite:false,toneMapped:false}));line.geometry.setDrawRange(0,0);line.visible=false;line.name='weapon-trail';line.frustumCulled=false;g.add(line);
+  // A strip swept between two points on the physical blade remains readable
+  // obliquely. Limit its history in time so a low frame rate cannot leave a long tail.
+  const geo=new T.BufferGeometry();
+  geo.setAttribute('position',new T.BufferAttribute(new Float32Array(8*2*3),3).setUsage(T.DynamicDrawUsage));
+  geo.setIndex(Array.from({length:7},(_,i)=>[2*i,2*i+1,2*i+2,2*i+1,2*i+3,2*i+2]).flat());
+  geo.setDrawRange(0,0);
+  const trail=new T.Mesh(geo,material(tint(role),.50));trail.name='weapon-trail';trail.visible=false;trail.frustumCulled=false;g.add(trail);
   const beam=new T.Line(new T.BufferGeometry().setAttribute('position',new T.BufferAttribute(new Float32Array(6),3)),new T.LineBasicMaterial({color:tint(role),transparent:true,opacity:.5,depthWrite:false,toneMapped:false}));beam.visible=false;beam.name='spell-thread';beam.frustumCulled=false;g.add(beam);
   const mote=new T.Mesh(new T.OctahedronGeometry(.035),material(tint(role),.6));mote.visible=false;mote.name='spell-mote';g.add(mote);
  }
@@ -73,17 +79,32 @@ export class BattleEffects{
   const silhouette=new T.Shape();silhouette.moveTo(-.09,1.2);silhouette.quadraticCurveTo(0,1.34,.09,1.2);silhouette.lineTo(.11,1.06);silhouette.lineTo(.24,.98);silhouette.lineTo(.28,.62);silhouette.lineTo(.18,.66);silhouette.lineTo(.2,.12);silhouette.lineTo(.08,.12);silhouette.lineTo(0,.5);silhouette.lineTo(-.08,.12);silhouette.lineTo(-.2,.12);silhouette.lineTo(-.18,.66);silhouette.lineTo(-.28,.62);silhouette.lineTo(-.24,.98);silhouette.lineTo(-.11,1.06);silhouette.closePath();
   for(let i=0;i<2;i++){const trail=new T.Mesh(new T.ShapeGeometry(silhouette),material(tint(role),.1));trail.name='afterimage';trail.position.set(from.x,.18,from.z);trail.rotation.y=Math.atan2(to.x-from.x,to.z-from.z);trail.userData.offset=i;g.add(trail);}
  }
- stepAction(progress:number,position:T.Vector3,_direction:number,tip?:T.Vector3,index=0,local=progress,reduced=false){
+ stepAction(progress:number,position:T.Vector3,_direction:number,tip?:T.Vector3,index=0,local=progress,reduced=false,edge?:T.Vector3,now=performance.now()){
   const g=this.action;if(!g)return;if(g.userData.martyr){g.children.forEach(o=>{const m=o as T.Mesh;(m.material as T.MeshBasicMaterial).opacity=.1*(1-progress);});return;}
-  const role=g.userData.role as VisibleRole,trail=g.getObjectByName('weapon-trail') as T.Line,beam=g.getObjectByName('spell-thread') as T.Line,mote=g.getObjectByName('spell-mote') as T.Mesh,active=!!tip&&local>.2&&local<.86&&!reduced;
+  const role=g.userData.role as VisibleRole,trail=g.getObjectByName('weapon-trail') as T.Mesh,beam=g.getObjectByName('spell-thread') as T.Line,mote=g.getObjectByName('spell-mote') as T.Mesh,active=!!tip&&local>.2&&local<.86&&!reduced;
   if(g.userData.index!==index){g.userData.points=[];g.userData.index=index;}
-  if(tip&&active){const points=g.userData.points as T.Vector3[];points.push(tip.clone());if(points.length>8)points.shift();const a=trail.geometry.getAttribute('position') as T.BufferAttribute;for(let i=0;i<points.length;i++)a.setXYZ(i,points[i].x,points[i].y,points[i].z);a.needsUpdate=true;trail.geometry.setDrawRange(0,points.length);}
-  trail.visible=active&&role==='guard';beam.visible=active&&role!=='guard'&&local<.64;mote.visible=beam.visible;
-  if(tip&&beam.visible){const target=(g.userData.steps as ActionStep[])[index],to=cellToWorld(target.x,target.y,1.03),a=beam.geometry.getAttribute('position') as T.BufferAttribute;a.setXYZ(0,tip.x,tip.y,tip.z);a.setXYZ(1,to.x,to.y,to.z);a.needsUpdate=true;mote.position.lerpVectors(tip,to,T.MathUtils.clamp((local-.24)/.34,0,1));}
+  const physical=role==='guard'||role==='king';
+  if(physical&&tip&&edge&&active){
+   const points=g.userData.points as {tip:T.Vector3;edge:T.Vector3;time:number}[];
+   while(points.length&&points[0].time<now-105)points.shift();
+   if(points.at(-1)?.time!==now)points.push({tip:tip.clone(),edge:edge.clone(),time:now});
+   if(points.length>8)points.shift();
+   const a=trail.geometry.getAttribute('position') as T.BufferAttribute;
+   points.forEach((p,i)=>{a.setXYZ(2*i,p.tip.x,p.tip.y,p.tip.z);a.setXYZ(2*i+1,p.edge.x,p.edge.y,p.edge.z);});
+   a.needsUpdate=true;trail.geometry.setDrawRange(0,Math.max(0,points.length-1)*6);
+  }
+  trail.visible=active&&physical;beam.visible=active&&!physical&&local<.65;mote.visible=beam.visible;
+  if(tip&&beam.visible){
+   const target=(g.userData.steps as ActionStep[])[index],to=cellToWorld(target.x,target.y,1.03);
+   const advance=T.MathUtils.smoothstep(local,.27,.58);
+   mote.position.lerpVectors(tip,to,advance);mote.scale.setScalar(role==='martyr'?2.3:1.45);
+   const a=beam.geometry.getAttribute('position') as T.BufferAttribute;
+   a.setXYZ(0,tip.x,tip.y,tip.z);a.setXYZ(1,mote.position.x,mote.position.y,mote.position.z);a.needsUpdate=true;
+  }
   const dir=new T.Vector3().fromArray(g.userData.direction??[0,0,1]);g.children.filter(o=>o.name==='afterimage').forEach(o=>{const lag=(o.userData.offset+1)*.13;o.position.copy(position).addScaledVector(dir,-lag);o.visible=!reduced&&progress>.18&&progress<.84;});
  }
  impact(x:number,y:number,role:VisibleRole='guard',direction=new T.Vector3(0,0,-1),reduced=false,now=performance.now(),victimRole:VisibleRole='unknown'){
-  const g=new T.Group();g.position.set(x-3,0,y-3);this.root.add(g);const color=tint(role);ring(g,.2,.022,color,reduced?.35:.6,.17);
+  const g=new T.Group();g.position.set(x-3,0,y-3);this.root.add(g);const color=tint(role);ring(g,reduced?.47:.2,reduced?.034:.022,color,reduced?.78:.6,.17);
   if(!reduced){
    const flash=new T.Mesh(new T.OctahedronGeometry(.13),material(color,.48));flash.name='contact-flash';flash.position.y=1.02;g.add(flash);
    const chips=new T.InstancedMesh(new T.OctahedronGeometry(1),material(tint(victimRole==='unknown'?role:victimRole),.65),this.particleBudget);chips.name='chips';chips.frustumCulled=false;g.add(chips);
@@ -105,6 +126,7 @@ export class BattleEffects{
   this.transients=this.transients.filter(t=>{const age=T.MathUtils.clamp((now-t.start)/t.life,0,1);if(age>=1){dispose(t.group);return false;}const fade=1-age;
    t.group.children.forEach(o=>{const m=o as T.Mesh,mat=m.material as T.MeshBasicMaterial;if(m.name==='chips'&&m instanceof T.InstancedMesh){const dir=t.direction!,side=new T.Vector3(-dir.z,0,dir.x),dummy=new T.Object3D();for(let i=0;i<m.count;i++){const spread=Math.sin(i*2.4)*.28;dummy.position.copy(dir).multiplyScalar(age*(.2+(i%3)*.08)).addScaledVector(side,spread*age);dummy.position.y=.95+Math.sin(age*Math.PI)*(.13+i%2*.08)-age*age*.16;dummy.rotation.set(age*(i+1),i*.7,age*i);dummy.scale.set(.018,.04,.012);dummy.updateMatrix();m.setMatrixAt(i,dummy.matrix);}m.instanceMatrix.needsUpdate=true;mat.opacity=.65*fade;}
     else if(m.name==='contact-flash'){m.visible=age<.24;mat.opacity=.48*(1-age/.24);m.scale.setScalar(.7+age*1.8);}
+    else if(t.reduced&&t.kind==='impact'){mat.opacity=.78*fade;m.scale.setScalar(1);}
     else{mat.opacity=(t.reduced?.3:.5)*fade;m.scale.setScalar(t.kind==='occupy'?1.3-age*.3:1+age*(t.kind==='collapse'?.25:1.05));}});return true;});
  }
  clearAction(){if(this.action)dispose(this.action);this.action=null;}

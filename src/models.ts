@@ -201,7 +201,8 @@ function buildCharacter(role:VisibleRole,side:Side):Character {
   if(role==='king'){for(const c of rig.weapon.children)c.position.y-=.48;rig.weapon.position.set(.21,.72,.23);}
   for(const child of body.children)child.position.y-=.78;body.position.y=.78;body.rotation.order='YXZ';
   model.updateMatrixWorld(true);if(role==='guard'||role==='king')rig.rightArm.attach(rig.weapon);
-  rig.weapon.userData.contact=role==='guard'?[0,.29,0]:role==='king'?[0,.64,0]:[0,.08,.06];
+  rig.weapon.userData.contact=role==='guard'?[0,.29,0]:role==='king'?[0,.64,0]:role==='unknown'?[0,.93,.21]:[0,.08,.06];
+  rig.weapon.userData.trailEdge=role==='guard'?[0,.79,0]:[0,.42,0];
   for(const part of Object.values(rig)){part.userData.bindPosition=part.position.toArray();part.userData.bindRotation=part.rotation.toArray();}
   batch(model);
   // A uniform scale keeps all base positions and visual footprints tied to one cell.
