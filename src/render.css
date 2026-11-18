@@ -1,0 +1,8 @@
+/* Gameplay stays on a single, native-resolution compositor surface. Edge masks
+   belong to the menu portrait, never to the interactive board or its text. */
+.game-scene .scene-host{mask-image:none!important;-webkit-mask-image:none!important}
+.game-scene canvas{touch-action:none}
+/* Skill overlays must not enlarge the page when selected. */
+.app:has(.board-hud) .selected-card{margin-bottom:0}
+.game-scene::after{display:block;content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,#0b1319 0,transparent 5%,transparent 94%,#0b1319 100%);box-shadow:none;z-index:1}
+.skill-context.guard-controls{background:linear-gradient(140deg,#1d2b30,#101a20);backdrop-filter:none}

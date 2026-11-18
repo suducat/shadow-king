@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { VisibleRole, Side } from './game';
 import {surface} from './surfaces';
 import {type FigurePose} from './battle-timeline';
@@ -184,11 +184,11 @@ function batch(group:T.Group){
   group.updateMatrixWorld(true);
   const map=new Map<T.Material,T.Mesh[]>();
   for(const c of group.children)if(c instanceof T.Mesh&&!Array.isArray(c.material)){const a=map.get(c.material)||[];a.push(c);map.set(c.material,a);}
-  for(const [material,objects]of map){if(objects.length<2)continue;const geometries=objects.map(o=>{o.updateMatrix();const g=o.geometry.clone().applyMatrix4(o.matrix);if(g.index)return g.toNonIndexed();return g;});
+  for(const [material,objects]of map){if(objects.length<2)continue;const geometries=objects.map(o=>{o.updateMatrix();const g=o.geometry.clone().applyMatrix4(o.matrix);if(g.index){const flat=g.toNonIndexed();g.dispose();return flat;}return g;});
     // All custom primitives have normals and UVs; make attributes uniform for merging.
     for(const g of geometries){for(const a of Object.keys(g.attributes))if(!['position','normal','uv'].includes(a))g.deleteAttribute(a);if(!g.getAttribute('uv'))g.setAttribute('uv',new T.BufferAttribute(new Float32Array(g.getAttribute('position').count*2),2));}
-    const merged=mergeGeometries(geometries);if(!merged)continue;
-    objects.forEach(o=>{group.remove(o);o.geometry.dispose();});geometries.forEach(g=>g.dispose());add(group,merged,material);
+    const merged=mergeGeometries(geometries);if(!merged){geometries.forEach(g=>g.dispose());continue;}
+    objects.forEach(o=>{group.remove(o);o.geometry.dispose();});geometries.forEach(g=>g.dispose());const indexed=mergeVertices(merged,1e-6);merged.dispose();add(group,indexed,material);
   }
 }
 function buildCharacter(role:VisibleRole,side:Side):Character {

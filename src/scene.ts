@@ -1,6 +1,9 @@
 import * as T from 'three';
 import {QUALITY,type Quality} from './quality';
-import {surface,disposeSurfaces} from './surfaces';
+import {BoardMarks} from './board-marks';
+import {RigidBatches} from './rigid-batches';
+import {renderResolution} from './render-resolution';
+import {surface,disposeSurfaces,setSurfaceSampling} from './surfaces';
 import {BattleEffects} from './battle-effects';
 import {battleTimeline,consumeCues,sampleBattle,retirementPose,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
 import type {CueOptions} from './audio';
@@ -58,6 +61,10 @@ export class BoardScene {
   actors = new Map<string, Actor>();
   tiles: T.Mesh[] = [];
   marks = new T.Group();
+  private boardMarks=new BoardMarks(this.marks);
+  batches=new RigidBatches(this.root);
+  batchingEnabled=true;
+  private measuredDensity=0;private displayDensity=0;bufferResizes=0;
   particles: T.Points;
   ray = new T.Raycaster();
   pointer = new T.Vector2();
@@ -88,7 +95,9 @@ export class BoardScene {
   constructor(public host: HTMLElement, onCell: (x: number, y: number) => void) {
     this.onCell = onCell;
     this.renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[this.quality].pixelRatio));
+    const gl=this.renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
+    this.batchingEnabled=!/SwiftShader|llvmpipe|softpipe/i.test(debug?String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)):'');
+    setSurfaceSampling(Math.min(this.renderer.capabilities.getMaxAnisotropy(),QUALITY[this.quality].anisotropy));
     this.renderer.shadowMap.enabled = false; this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
     this.renderer.outputColorSpace = T.SRGBColorSpace; this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.08;
     this.renderer.domElement.setAttribute('aria-label', '可交互的三维魔法棋盘，点击己方棋子，再点击亮起的合法格子');
@@ -105,6 +114,7 @@ export class BoardScene {
     const cold = new T.DirectionalLight(0x7cc0e3, 2.4); cold.position.set(5, 5, -7); this.scene.add(cold);
     const rim = new T.PointLight(0xa3bed2, 8, 18); rim.position.set(-6, 3, -4); this.scene.add(rim);
     this.makeBoard(); this.makeHall();
+    this.scene.onBeforeRender=()=>{if(this.batchingEnabled)this.batches.sync([...this.actors].map(([id,a])=>({id,model:a.model,exclude:a.disposed||!!this.transition?.victims.some(v=>v.actor===a)})),true);};
     const positions = new Float32Array(100 * 3);
     for (let i = 0; i < 100; i++) { positions[i * 3] = (Math.random() - .5) * 22; positions[i * 3 + 1] = Math.random() * 7; positions[i * 3 + 2] = (Math.random() - .5) * 18; }
     const pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(positions, 3));
@@ -220,25 +230,13 @@ export class BoardScene {
       (actor.rune.material as T.MeshBasicMaterial).color.setHex(p.charging?0xc1d8e5:occupying?0xd3a1ed:p.role==='martyr'?0xb394ce:p.side==='red'?RED:BLUE);
       actor.rune.scale.setScalar(occupying?1.45:selected?1.2:p.charging?1.25:1);
     }
-    this.marks.children.forEach(c => this.disposeGroup(c)); this.marks.clear();
-    const chosen = next.pieces.find(p => p.id === next.selected);
-    if (chosen) {
-      const square = mesh(new T.PlaneGeometry(.94,.94),new T.MeshBasicMaterial({color:0xe2bc70,transparent:true,opacity:.23,depthWrite:false}),chosen.x-3,.145,chosen.y-3,this.marks);
-      square.rotation.x=-Math.PI/2;
-    }
-    for (const t of next.legal) {
-      const occupied = next.pieces.some(p => p.x === t.x && p.y === t.y);
-      const g = new T.Group(); g.position.set(t.x - 3, .16, t.y - 3); this.marks.add(g);
-      const tint = mesh(new T.PlaneGeometry(.9,.9),new T.MeshBasicMaterial({color:occupied?0xe8a175:0xd8c68c,transparent:true,opacity:.18,depthWrite:false}),0,.002,0,g); tint.rotation.x=-Math.PI/2;
-      ring(g, occupied ? .42 : .25, .005, occupied ? 0xea956b : 0xdbc58b, .95);
-      if(occupied){for(const sign of [-1,1])line(g,[new T.Vector3(-.12,.016,sign*.12),new T.Vector3(.12,.016,-sign*.12)],0xffb095,.95);}
-      if (!occupied) { const dot = mesh(new T.CircleGeometry(.06, 20), new T.MeshBasicMaterial({ color: 0xf0d49a, transparent: true, opacity: .85 }), 0, .005, 0, g); dot.rotation.x = -Math.PI / 2; }
-    }
+    this.boardMarks.update(next.pieces.find(p=>p.id===next.selected),next.legal.map(p=>({...p,occupied:next.pieces.some(q=>q.x===p.x&&q.y===p.y)})));
     if(this.transition)this.transition.pendingState=next;
     this.syncEffects(next,this.transition&&!this.transition.ceremonyCommitted?this.transition.beforeRites:next.ritual,performance.now());
-    if(next.viewer!==previousViewer){this.renderer.render(this.scene,this.camera);this.renderedFrames++;this.lastRender=performance.now();}
+    // Reconcile first; one RAF renders after camera and matrices are settled.
 
   }
+  setBatching(enabled:boolean){if(enabled===this.batchingEnabled)return;this.batches.clear();this.batchingEnabled=enabled;this.dirty=true;}
   setQuality(value:Quality){
     if(value===this.quality&&!this.pendingQuality)return;
     // Defer mesh replacement until the active animation has settled. Changing
@@ -248,16 +246,16 @@ export class BoardScene {
   private applyQuality(){
     if(!this.pendingQuality||this.transition)return;
     this.quality=this.pendingQuality;this.pendingQuality=null;const q=QUALITY[this.quality];
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
+    this.batches.clear();setSurfaceSampling(Math.min(this.renderer.capabilities.getMaxAnisotropy(),q.anisotropy));this.measuredDensity=0;
     this.renderer.shadowMap.enabled=!!q.shadow;
     if(q.shadow){this.keyLight.shadow.mapSize.set(q.shadow,q.shadow);this.keyLight.shadow.map?.dispose();this.keyLight.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}
     this.scene.traverse(o=>{if(o.userData.decorativeLight)o.visible=this.quality==='high';});
     this.particles.geometry.setDrawRange(0,q.particles);this.fx.setQuality(this.quality==='low');
     for(const[id,actor]of this.actors)this.removeActor(id,actor);
-    this.update(this.state);this.renderer.setSize(this.host.clientWidth,this.host.clientHeight);this.dirty=true;
+    this.update(this.state);this.resize();this.dirty=true;
   }
   resetActors() {
-    this.cancelMove();
+    this.batches.clear();this.cancelMove();
     for(const[id,actor]of this.actors)this.removeActor(id,actor);
     this.fx.reset();this.audioQueue=[];this.clearCameraImpulse();
     this.actors.clear();
@@ -334,12 +332,16 @@ export class BoardScene {
   syncLayout() { this.resize(); }
   layoutReady() {
     const c=this.renderer.domElement,r=c.getBoundingClientRect(),h=this.host.getBoundingClientRect();
-    return Math.abs(r.width-h.width)<1&&Math.abs(r.height-h.height)<1&&Math.abs(this.camera.aspect-this.host.clientWidth/this.host.clientHeight)<.002;
+    return Math.abs(r.width-h.width)<1&&Math.abs(r.height-h.height)<1&&Math.abs(this.camera.aspect-h.width/h.height)<.00001;
   }
   private resize() {
-    const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h || (w===this.measuredWidth && h===this.measuredHeight)) return;
-    this.dirty=true;this.measuredWidth=w;this.measuredHeight=h;
-    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    const rect=this.host.getBoundingClientRect(),w=rect.width,h=rect.height;
+    if(w<=0||h<=0)return;
+    const {ratio}=renderResolution(w,h,devicePixelRatio,this.quality);this.displayDensity=devicePixelRatio;
+    if(Math.abs(w-this.measuredWidth)<.01&&Math.abs(h-this.measuredHeight)<.01&&Math.abs(ratio-this.measuredDensity)<.0001)return;
+    this.measuredWidth=w;this.measuredHeight=h;this.measuredDensity=ratio;this.displayDensity=devicePixelRatio;this.dirty=true;this.renderer.domElement.dataset.ready='false';
+    this.renderer.setDrawingBufferSize(w,h,ratio);this.bufferResizes++;
+    this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
   }
   private pointerDown = (e: PointerEvent) => {
     if (!e.isPrimary || (e.button !== 0 && e.button !== 2)) return;
@@ -383,6 +385,7 @@ export class BoardScene {
     if (this.dead) return;
     this.frame = requestAnimationFrame(this.animate);
     this.applyQuality();
+    if(devicePixelRatio!==this.displayDensity)this.resize();
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, .05); this.last = now;
     // Full privacy/result covers have no interactive 3D content. Stop their
     // hidden GPU work so DOM/SVG ending animation can use the compositor freely.
@@ -428,10 +431,10 @@ export class BoardScene {
       if (age > 1.1) { this.root.remove(this.burst.group); this.disposeGroup(this.burst.group); this.burst = null; }
     }
     if (!this.state.reduced) this.particles.rotation.y += dt * .007;
-    const ready=String(this.layoutReady()&&Math.abs(this.angle-this.desiredAngle)<.0008&&Math.abs(this.zoom-this.desiredZoom)<.001);
+    const ready=String(this.measuredWidth>0&&this.measuredHeight>0&&Math.abs(this.angle-this.desiredAngle)<.0008&&Math.abs(this.zoom-this.desiredZoom)<.001);
     if(this.renderer.domElement.dataset.ready!==ready)this.renderer.domElement.dataset.ready=ready;
     const moving=!!this.transition||!!this.burst||this.fx.transients.length>0||ready==='false';
-    if (!document.hidden&&(this.dirty||moving||(!this.state.reduced&&now-this.lastRender>33))){
+    if (!document.hidden&&(this.dirty||moving||(!this.state.reduced&&now-this.lastRender>1000/QUALITY[this.quality].idleFps))){
       this.renderer.render(this.scene,this.camera);this.renderedFrames++;this.lastRender=now;this.dirty=false;
       const cues=this.audioQueue.splice(0);if(!document.hidden)for(const cue of cues)if(now-cue.at<180)this.onBattleCue?.(cue.kind,cue.options);
     }
@@ -443,13 +446,13 @@ export class BoardScene {
     if(this.actors.get(id)!==actor||actor.disposed)return;actor.disposed=true;actor.group.removeFromParent();this.actors.delete(id);this.disposeGroup(actor.group);
   }
   private disposeGroup(g: T.Object3D) {
-    g.traverse(o => { if (o instanceof T.Mesh || o instanceof T.Line) { if(!o.geometry?.userData.shared)o.geometry?.dispose(); const materials = Array.isArray(o.material) ? o.material : [o.material]; for (const m of materials) if (!m.userData.shared && m !== metal && m !== darkMetal && m !== obsidian) { for(const value of Object.values(m))if(value instanceof T.Texture&&!value.userData.shared)value.dispose(); m.dispose(); } } });
+    g.traverse(o => { if (o instanceof T.Mesh || o instanceof T.Line) { if(o instanceof T.InstancedMesh)o.dispose();if(!o.geometry?.userData.shared)o.geometry?.dispose(); const materials = Array.isArray(o.material) ? o.material : [o.material]; for (const m of materials) if (!m.userData.shared && m !== metal && m !== darkMetal && m !== obsidian) { for(const value of Object.values(m))if(value instanceof T.Texture&&!value.userData.shared)value.dispose(); m.dispose(); } } });
   }
   destroy() {
     this.cancelMove(); this.dead = true; cancelAnimationFrame(this.frame); this.observer.disconnect();
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown); this.renderer.domElement.removeEventListener('pointerup', this.pointerUp); this.renderer.domElement.removeEventListener('pointermove', this.pointerMove); this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.removeEventListener('lostpointercapture', this.pointerCancel);
-    this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();
+    this.batches.clear();this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();
   }
 }

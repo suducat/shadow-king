@@ -17,7 +17,7 @@ export class BattleEffects{
  private statePieces:VisiblePiece[]=[];private pending:string|null=null;private mode?:GameMode;private particleBudget=8;
  setQuality(low:boolean){this.particleBudget=low?6:8;}
  constructor(private root:T.Group){
-  root.add(this.altar,this.preview,this.light);this.light.position.set(0,2.4,0);this.altar.visible=false;
+  this.light.visible=false;root.add(this.altar,this.preview,this.light);this.light.position.set(0,2.4,0);this.altar.visible=false;
   for(let i=0;i<4;i++){const q=i-1.5;this.border.push(strip(this.altar,q,-1.5,q,1.5,i===0||i===3?.075:.035,PURPLE,.1),strip(this.altar,-1.5,q,1.5,q,i===0||i===3?.075:.035,PURPLE,.1));}
   for(const k of [-1,1]){this.border.push(strip(this.altar,-1.57,k*1.57,1.57,k*1.57,.045,GOLD,.08),strip(this.altar,k*1.57,-1.57,k*1.57,1.57,.045,GOLD,.08));}
   this.core=new T.Group();this.altar.add(this.core);for(const r of [.43,.53,1.18,1.3])this.sigils.push(ring(this.core,r,.018,r<1?GOLD:PURPLE,.08,.163));
@@ -31,7 +31,7 @@ export class BattleEffects{
  update(mode:GameMode|undefined,rites:Rites|undefined,pieces:VisiblePiece[],preview:ActionStep[]=[],pending:string|null=null,previewOrigin?:VisiblePiece,now=performance.now(),reduced=false){
   const cues:string[]=[];
   if(mode!==this.mode)this.clearTransient();
-  this.mode=mode;this.altar.visible=mode==='ritual';this.pending=pending;
+  this.mode=mode;this.light.visible=mode==='ritual';this.altar.visible=mode==='ritual';this.pending=pending;
   const active=mode==='ritual'&&!!rites&&Object.values(rites).some(r=>r.phase!=='dormant');
   const occupied=active&&Object.values(rites!).some(r=>r.phase==='occupied');
   if(active&&!this.active){this.openedAt=now;cues.push('rite-open');if(!reduced)this.ceremony('open',now);}
@@ -99,7 +99,7 @@ export class BattleEffects{
   this.sigils.forEach(m=>(m.material as T.MeshBasicMaterial).opacity=this.active?(this.occupied?.65:.4)+(reduced?0:Math.sin(now*.0017)*.055):.055);
   this.core.rotation.y=reduced?0:this.occupied?Math.sin(now*.0007)*.015:now*.00004;
   this.flow.forEach((m,i)=>{m.visible=this.active;const t=(i/12+(reduced?0:now*.000035))%1,q=t*4,n=Math.floor(q),f=(q-n)*3,coords=[[-1.5+f,-1.5],[1.5,-1.5+f],[1.5-f,1.5],[-1.5,1.5-f]][n];if(this.occupied){const a=i*Math.PI/6,r=1.48*(1-((reduced?.4:now*.00022)+i/12)%1);m.position.set(Math.sin(a)*r,.18,Math.cos(a)*r);m.rotation.z=-a;}else{m.position.set(coords[0],.18,coords[1]);m.rotation.z=n%2?Math.PI/2:0;}});
-  this.light.intensity=this.active?(this.occupied?1.8:1.15)+(reduced?0:Math.sin(wake*Math.PI)*1.2):0;
+  this.light.visible=this.mode==='ritual';this.light.intensity=this.active?(this.occupied?1.8:1.15)+(reduced?0:Math.sin(wake*Math.PI)*1.2):0;
   for(const[id,g]of this.charges){const a=actors.get(id),p=this.statePieces.find(p=>p.id===id);if(!a||!p)continue;g.position.copy(a.group.position);const rise=T.MathUtils.smoothstep((now-g.userData.began)/450,0,1);g.rotation.y=reduced?0:Math.sin(now*.0008)*.012;g.children.forEach(c=>{if(c.userData.spark!==undefined){const t=(now*.0005+c.userData.spark/5)%1,angle=c.userData.spark*Math.PI*.4;c.position.set(Math.cos(angle)*.36*(1-t),.18+t*.82,Math.sin(angle)*.36*(1-t));c.visible=!reduced&&rise>.2;}if(c.name==='blade'){const weapon=a.group.getObjectByName('rig-weapon');if(weapon){g.updateWorldMatrix(true,false);const point=weapon.localToWorld(new T.Vector3(0,.29,.014));c.position.copy(g.worldToLocal(point));weapon.getWorldQuaternion(c.quaternion);c.quaternion.premultiply(g.getWorldQuaternion(new T.Quaternion()).invert());}c.scale.y=.55+.45*rise;}});}
   for(const[id,g]of this.royalMarks){const a=actors.get(id);if(a)g.position.copy(a.group.position);g.rotation.y=reduced?0:now*.00008;}
   this.transients=this.transients.filter(t=>{const age=T.MathUtils.clamp((now-t.start)/t.life,0,1);if(age>=1){dispose(t.group);return false;}const fade=1-age;

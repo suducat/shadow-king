@@ -1,5 +1,6 @@
 import * as T from 'three';
-const textures=new Map<string,T.CanvasTexture>();
+const textures=new Map<string,T.CanvasTexture>();let sampling=4;
+export function setSurfaceSampling(value:number){sampling=value;for(const t of textures.values())if(t.anisotropy!==value){t.anisotropy=value;t.needsUpdate=true;}}
 // Authored in code: deterministic, tile-sized mineral grain, hammered metal,
 // and woven fabric. Linear scalar maps are separate from sRGB albedo maps.
 export function surface(kind:'stone'|'metal'|'fabric',color=false){
@@ -10,6 +11,6 @@ export function surface(kind:'stone'|'metal'|'fabric',color=false){
  if(kind==='stone')for(let i=0;i<5;i++){const start=rnd()*256;x.strokeStyle='rgba(65,71,71,.16)';x.lineWidth=.4+rnd()*.7;x.beginPath();x.moveTo(start,0);x.bezierCurveTo(start+15,95,start-25,170,start+8,256);x.stroke();}
  if(kind==='metal')for(let i=0;i<100;i++){x.strokeStyle='rgba(225,221,202,.1)';x.lineWidth=.3;x.beginPath();const a=rnd()*256,b=rnd()*256;x.moveTo(a,b);x.lineTo(a+rnd()*12,b+rnd()*2);x.stroke();}
  if(kind==='fabric')for(let i=0;i<256;i+=3){x.strokeStyle=i%2?'#999':'#777';x.lineWidth=.5;x.beginPath();x.moveTo(i,0);x.lineTo(i,256);x.moveTo(0,i);x.lineTo(256,i);x.stroke();}
- texture=new T.CanvasTexture(c);if(color)texture.colorSpace=T.SRGBColorSpace;texture.wrapS=texture.wrapT=T.RepeatWrapping;if(kind==='fabric')texture.repeat.set(2,4);texture.userData.shared=true;textures.set(key,texture);return texture;
+ texture=new T.CanvasTexture(c);texture.anisotropy=sampling;if(color)texture.colorSpace=T.SRGBColorSpace;texture.wrapS=texture.wrapT=T.RepeatWrapping;if(kind==='fabric')texture.repeat.set(2,4);texture.userData.shared=true;textures.set(key,texture);return texture;
 }
 export function disposeSurfaces(){textures.forEach(t=>t.dispose());textures.clear();}

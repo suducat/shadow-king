@@ -1,7 +1,7 @@
 {
   "name": "shadow-king",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -33,7 +33,9 @@
     "test:combat:browser": "node tests/combat-browser.cjs",
     "test:combat:production": "node tests/combat-production.cjs && node tests/combat-production.cjs --ritual",
     "record:combat": "node scripts/v07-reel.cjs",
-    "test:combat:background": "node tests/combat-background.cjs"
+    "test:combat:background": "node tests/combat-background.cjs",
+    "test:rendering": "tsx --test tests/rendering.test.ts tests/quality.test.ts",
+    "test:rendering:browser": "node tests/rendering-browser.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
