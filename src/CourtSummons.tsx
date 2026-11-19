@@ -31,7 +31,7 @@ export function CourtSummons({rule,room,begin,toggle,cancel,back}:Props){
     try{await navigator.clipboard.writeText(room.code);setCopied('密令已复制');}
     catch{setCopied('请选中上方密令并手动复制。');}
    }}><Copy size={16}/>复制密令</button>
-   <p className="court-wait" role="status">{copied||'静候另一位执棋者'}</p>
+   <p className="court-wait" role="status">{copied||room.message||'静候另一位执棋者'}</p>
   </div>}
   {join&&!ready&&room?.side!=='red'&&<form className="court-join" onSubmit={enter}>
    <label htmlFor="court-secret">邀约密令</label>
@@ -39,7 +39,7 @@ export function CourtSummons({rule,room,begin,toggle,cancel,back}:Props){
     value={secret} onChange={e=>setSecret(e.target.value.replace(/\D/g,''))} disabled={busy} required/>
    <button className="primary" disabled={busy||secret.length!==6}><KeyRound size={16}/>确认入局</button>
   </form>}
-  {busy&&<p role="status" className="court-message">{room.side==='blue'?'正在回应邀约……':'正在发出邀约……'}</p>}
+  {busy&&<p role="status" className="court-message">{room.message||(room.side==='blue'?'正在回应邀约……':'正在发出邀约……')}</p>}
   {room?.stage==='error'&&<p role="alert" className="court-message court-error">{room.message}</p>}
   {ready&&<div className="court-ready">
    <p role="status" className="court-message">{room.starting?'棋局启幕':'应邀者已至'}</p>

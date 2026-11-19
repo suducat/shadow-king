@@ -1,3 +1,4 @@
+import {courtIce} from './court-ice';
 import type {DataConnection,Peer as PeerInstance} from 'peerjs';
 import {other,type Game,type Role,type Side} from './game';
 import type {GameAction,GameMode} from './ritual';
@@ -9,6 +10,8 @@ import {
 const protocol=1,gameVersion='0.8.1';
 const namespace='shadow-king-summons-v1-';
 const failure='邀约未能建立，请重试。';
+const signalFailure='暂时无法连接邀约服务，请检查网络后重试。';
+const channelFailure='已找到邀约，但两台设备未建立连接。请切换网络后重试。';
 const invalid='密令无效或已失效。';
 const full='此局已有执棋者。';
 const absent='对方暂离王庭';
@@ -60,8 +63,8 @@ export class CourtSession{
   this.state={stage:side==='red'?'opening':'connecting',code:secret,side,ready:false,otherReady:false,starting:false,message:'',pending:false};
  }
  private update(next:Partial<State>){this.state={...this.state,...next};if(!this.closed)this.publish(this.state);}
- private arm(message=failure){
-  clearTimeout(this.timer);this.timer=setTimeout(()=>this.fail(message),18_000);
+ private arm(message=failure,ms=18_000,onTimeout=()=>this.fail(message)){
+  clearTimeout(this.timer);this.timer=setTimeout(onTimeout,ms);
  }
  private fail(message:string){
   if(this.closed||this.failed)return;
@@ -85,12 +88,12 @@ export class CourtSession{
   this.channel.send(payload);
  }
  async open(){
-  this.update({});this.arm();
+  this.update({message:'正在连接邀约服务……'});this.arm(signalFailure,9000);
   try{
    const {default:Peer}=await import('peerjs');
    const signal=import.meta.env.MODE==='test'&&import.meta.env.VITE_PEER_TEST_PORT?
     {host:'127.0.0.1',port:Number(import.meta.env.VITE_PEER_TEST_PORT),path:'/',secure:false,config:{iceServers:[]}}:
-    {secure:true};
+    {secure:true,config:await courtIce()};
    if(!this.active)return;
    let attempts=0;
    const allocate=()=>{
@@ -100,8 +103,8 @@ export class CourtSession{
     this.peer=peer;
     peer.on('open',()=>{
      if(!this.active||generation!==this.peerGeneration)return;
-     if(host){clearTimeout(this.timer);this.update({stage:'waiting',code:room});}
-     else{this.arm();this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json'}));}
+     if(host){clearTimeout(this.timer);this.update({stage:'waiting',code:room,message:''});}
+     else{this.update({message:'正在寻找密令对应的王庭……'});this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json'}));}
     });
     peer.on('connection',channel=>{
      if(!this.active||generation!==this.peerGeneration){channel.close();return;}
@@ -118,29 +121,48 @@ export class CourtSession{
       ++this.peerGeneration;peer.destroy();allocate();return;
      }
      if(this.channel?.open&&['network','disconnected','server-error','socket-error','socket-closed','peer-unavailable'].includes(error.type))return;
-     this.fail(error.type==='peer-unavailable'?invalid:failure);
+     if(host&&this.channel&&this.state.stage==='waiting'&&!this.match&&error.type==='webrtc')return;
+     this.fail(error.type==='peer-unavailable'?invalid:this.channel?channelFailure:signalFailure);
     });
-    peer.on('disconnected',()=>{if(this.active&&!this.channel?.open)this.fail(failure);});
+    peer.on('disconnected',()=>{if(this.active&&!this.channel?.open)this.fail(signalFailure);});
    };
    allocate();
   }catch{this.fail(failure);}
  }
  private attach(channel:DataConnection){
-  this.channel=channel;this.arm();this.lastSignal=Date.now();
-  const disconnected=()=>{if(this.channel===channel)this.fail(this.match?absent:failure);};
+  this.channel=channel;this.lastSignal=Date.now();
+  const drop=()=>{
+   if(!this.active||this.channel!==channel)return;
+   if(this.state.side==='red'&&this.state.stage==='waiting'&&!this.match){
+    // An unreachable visitor must not invalidate an otherwise open invite.
+    this.channel=undefined;clearTimeout(this.timer);clearInterval(this.heartbeat);channel.close();
+    this.update({message:'上一次连接未能建立，密令仍可使用。'});
+   }else this.fail(this.match?absent:channelFailure);
+  };
+  this.arm(channelFailure,12_000,drop);
+  const pc=channel.peerConnection;
+  const onIce=()=>{
+   if(!this.active||this.channel!==channel||channel.open)return;
+   if(pc.iceConnectionState==='failed'){drop();return;}
+   if(this.state.side==='blue'&&pc.remoteDescription)this.update({message:'已找到王庭，正在建立两台设备的连接……'});
+  };
+  pc?.addEventListener('iceconnectionstatechange',onIce);
+  channel.once('close',()=>pc?.removeEventListener('iceconnectionstatechange',onIce));
   let openedOnce=false;
   const opened=()=>{
    if(!this.active||this.channel!==channel||openedOnce)return;
    openedOnce=true;
+   this.arm(failure,7000);
+   if(this.state.side==='blue')this.update({message:'连接已建立，正在核对棋局规则……'});
    this.heartbeat=setInterval(()=>{
-    if(Date.now()-this.lastSignal>22_000){disconnected();return;}
-    try{this.send({type:'ping'});}catch{disconnected();}
+    if(Date.now()-this.lastSignal>22_000){drop();return;}
+    try{this.send({type:'ping'});}catch{drop();}
    },6_000);
    if(this.state.side==='blue')this.send({type:'hello',protocol,gameVersion,rule:this.rule});
   };
   channel.on('open',opened);
-  channel.on('close',disconnected);
-  channel.on('error',disconnected);
+  channel.on('close',drop);
+  channel.on('error',drop);
   channel.on('data',data=>{
    this.mailbox=this.mailbox.then(async()=>{
     if(!this.active||this.channel!==channel)return;
