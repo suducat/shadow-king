@@ -50,6 +50,13 @@ export async function combatProbe(scene:BoardScene){
   if(!fps)step(1.1);else{for(let t=0;t<tr.duration;t+=1000/fps)step(Math.max(tr.lastProgress,t/tr.duration));step(1.1);}await p;actions++;
   const hits=scene.cueLog.slice(before).filter(c=>c.kind==='impact');check(hits.length===steps.length,`all contacts ${name}/${fps}`);check(healthy()&&scene.actors.size===next.pieces.length,`all bodies ${name}/${fps}`);
  }
+ // Exposure travels on the public action, independently of perspective.
+ scene.resetActors();
+ const charging=ritualFixture('charge');
+ update(charging,'blue');
+ scene.unsealActor('red-0','guard');
+ check(scene.actors.get('red-0')?.role==='guard','charge exposes the shadow guard');
+ check(scene.fx.transients.some(t=>t.kind==='unseal'),'guard veil and armour cue');
  // A rule commit must not erase a charged victim or break its altar before contact.
  for(const scenario of ['charged-victim','occupied-king','rite-opening'] as const){
   scene.resetActors();let g=ritualFixture(scenario==='occupied-king'?'counter':scenario==='rite-opening'?'execute-open':'charge');
@@ -62,7 +69,10 @@ export async function combatProbe(scene:BoardScene){
   step(tr.line.contacts[0]+.001);
   if(scenario==='charged-victim')check(!scene.fx.charges.has('blue-0'),'charged victim rune ends on contact');
   if(scenario==='occupied-king')check(scene.fx.transients.filter(t=>t.kind==='collapse').length===1,'occupation breaks exactly on contact');
-  if(scenario==='rite-opening')check(scene.fx.active&&scene.fx.royalMarks.size===1,'rite opens exactly on contact');
+  if(scenario==='rite-opening'){
+   check(scene.fx.active&&scene.fx.royalMarks.size===1,'rite opens exactly on contact');
+   check(scene.fx.transients.some(t=>t.kind==='unseal')&&scene.actors.get('blue-3')?.role==='king','royal veil sheds on public disclosure');
+  }
   step(1.1);await p;actions++;
  }
  // Repeated render/release cycles detect GPU-side resource growth, not just maps.

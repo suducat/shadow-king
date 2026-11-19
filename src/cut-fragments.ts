@@ -14,25 +14,27 @@ export function cutFragments(model:T.Group,root:T.Group){
   const matrix=frame.clone().multiply(mesh.matrixWorld),v=new T.Vector3();
   const positions=new Float32Array(points.count*3);
   for(let i=0;i<points.count;i++)v.fromBufferAttribute(points,i).applyMatrix4(matrix).toArray(positions,i*3);
-  const remaps=buckets.map(()=>new Map<number,number>());
+  const remaps=buckets.map(()=>new Uint32Array(points.count));
   const color=mesh.material.color as T.Color;
+  const append=(bucket:number,vertex:number)=>{
+   const target=buckets[bucket],remap=remaps[bucket];
+   let mapped=remap[vertex];
+   if(!mapped){
+    mapped=target.vertices.length/3+1;remap[vertex]=mapped;
+    const offset=vertex*3;
+    target.vertices.push(positions[offset],positions[offset+1],positions[offset+2]);
+    target.colors.push(color.r,color.g,color.b);
+   }
+   target.indices.push(mapped-1);
+  };
   const count=idx?.count??points.count;
   for(let i=0;i<count;i+=3){
    const a=idx?idx.getX(i):i,b=idx?idx.getX(i+1):i+1,c=idx?idx.getX(i+2):i+2;
    const x=(positions[3*a]+positions[3*b]+positions[3*c])/3;
    const y=(positions[3*a+1]+positions[3*b+1]+positions[3*c+1])/3;
    const height=y+.55*x;
-   const k=height<.22?0:height<.78?(x>0?1:2):(height>1.13?4:3);
-   const bucket=buckets[k],remap=remaps[k];
-   for(const vertex of [a,b,c]){
-    let index=remap.get(vertex);
-    if(index===undefined){
-     index=bucket.vertices.length/3;remap.set(vertex,index);
-     bucket.vertices.push(positions[3*vertex],positions[3*vertex+1],positions[3*vertex+2]);
-     bucket.colors.push(color.r,color.g,color.b);
-    }
-    bucket.indices.push(index);
-   }
+   const band=height<.22?0:height<.78?(x>0?1:2):(height>1.13?4:3);
+   append(band,a);append(band,b);append(band,c);
   }
  });
  const group=new T.Group();group.position.copy(origin);

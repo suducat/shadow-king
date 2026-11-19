@@ -15,7 +15,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { bodyPickMesh, cellToWorld, clientToNDC, intersectBoard,resolvePick } from './interaction';
 
 type SceneState = { pieces: VisiblePiece[]; selected: string | null; legal: { x: number; y: number }[]; viewer: Side | null; cinematic: boolean; reduced: boolean; deployment: boolean; active: boolean; mode?:GameMode; ritual?:Rites; preview?:ActionStep[]; pendingCharge?:string|null };
-type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; revealStarted?:number; rest:()=>void; disposed:boolean;facing:number };
+type Unseal={start:number;color:number;surfaces:Map<T.MeshStandardMaterial,{color:T.Color;intensity:number}>};
+type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; unseal?:Unseal; rest:()=>void; disposed:boolean;facing:number };
 const GOLD = 0xb7955d, RED = 0xd7654e, BLUE = 0x6ca9bd;
 const mat = (color: T.ColorRepresentation, metalness = .55, roughness = .42) => new T.MeshStandardMaterial({ color, metalness, roughness });
 const metal = mat(GOLD, .8, .3), darkMetal = mat(0x403b2d, .76, .35), obsidian = mat(0x111c20, .6, .5);
@@ -47,7 +48,7 @@ function makeActor(p: VisiblePiece,quality:Quality): Actor {
   return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0};
 }
 
-type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean};
+type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean;fracture?:T.Group;};
 type Motion={id:string;victimId?:string;role:VisibleRole;actor:Actor;victim?:Actor;victims:Victim[];steps:ActionStep[];execution:boolean;cues:BattleCue[];emitted:Set<number>;silent:boolean;impacts:Set<number>;restore:()=>void;from:T.Vector3;to:T.Vector3;start:number;duration:number;impact:boolean;finish:(completed:boolean)=>void;line:Timeline;publicBeats:PublicBeats;pendingState?:SceneState;beforeRites?:Rites;beforePieces:VisiblePiece[];ceremonyCommitted:boolean;lastProgress:number;fromFacing:number;goalFacing:number;groupKey:string;startLift:number};
 let sceneSerial=0;
 const shortAngle=(angle:number)=>Math.atan2(Math.sin(angle),Math.cos(angle));
@@ -95,6 +96,9 @@ export class BoardScene {
   private measuredWidth = 0; private measuredHeight = 0;
   private last = performance.now();
   private lastCamera = performance.now();
+  private cameraFitKey = "";
+  private cameraFitDistance = 0;
+  private lastMotionShadow=-Infinity;
   constructor(public host: HTMLElement, onCell: (x: number, y: number) => void) {
     this.onCell = onCell;
     this.renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -122,7 +126,8 @@ export class BoardScene {
     const cold = new T.DirectionalLight(0x7cc0e3, 2.4); cold.position.set(5, 5, -7); this.scene.add(cold);
     const rim = new T.PointLight(0xa3bed2, 8, 18); rim.position.set(-6, 3, -4); this.scene.add(rim);
     this.makeBoard(); this.makeHall();
-    this.scene.onBeforeRender=()=>{if(this.batchingEnabled)this.batches.sync([...this.actors].map(([id,a])=>({id,model:a.model,exclude:a.disposed||!!this.transition?.victims.some(v=>v.actor===a)})),true);};
+    this.scene.onBeforeRender=()=>{if(this.batchingEnabled)this.batches.sync([...this.actors].map(([id,a])=>({id,model:a.model,exclude:a.disposed||!!a.unseal||this.transition?.id===id||!!this.transition?.victims.some(v=>v.actor===a)})),true);};
+    this.scene.onAfterRender=()=>this.batches.restore();
     const positions = new Float32Array(100 * 3);
     for (let i = 0; i < 100; i++) { positions[i * 3] = (Math.random() - .5) * 22; positions[i * 3 + 1] = Math.random() * 7; positions[i * 3 + 2] = (Math.random() - .5) * 18; }
     const pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(positions, 3));
@@ -222,12 +227,10 @@ export class BoardScene {
       let actor = this.actors.get(p.id);
       const deferred=this.transition?.publicBeats.reveals.some(r=>r.id===p.id&&!this.transition!.impacts.has(r.step));
       if ((!actor || actor.role !== p.role)&&!deferred) {
-        const unseal=next.mode==='ritual'&&p.revealed&&p.role==='king'&&actor?.role==='unknown';
         if (actor) { this.removeActor(p.id,actor); }
-        actor = makeActor(p,this.quality);if(unseal)actor.revealStarted=performance.now();this.root.add(actor.group); this.actors.set(p.id, actor);
+        actor = makeActor(p,this.quality);this.root.add(actor.group); this.actors.set(p.id, actor);
       }
       if(!actor)continue;
-      if(next.mode!=='ritual'||next.deployment)actor.revealStarted=undefined;
       const target = new T.Vector3(p.x - 3, .18, p.y - 3);
       actor.group.userData = { x: p.x, y: p.y, actorId:p.id };
       if (actor.target.distanceTo(target) > .01) { actor.target.copy(target); actor.moving = next.reduced ? 0 : performance.now(); if ((next.reduced || next.deployment)&&this.transition?.id!==p.id) actor.group.position.copy(target); }
@@ -273,6 +276,22 @@ export class BoardScene {
     const next=makeActor({id,role,side:old.side,x:old.group.userData.x,y:old.group.userData.y},this.quality);next.group.position.copy(old.group.position);next.target.copy(old.target);
     next.facing=shortAngle(old.model.rotation.y+old.facing-next.model.rotation.y);this.removeActor(id,old);this.actors.set(id,next);this.root.add(next.group);for(const v of this.transition?.victims??[])if(v.actor===old)v.actor=next;
   }
+  unsealActor(id:string,role:'king'|'guard',now=performance.now()){
+    this.revealActor(id,role);
+    const actor=this.actors.get(id);
+    if(!actor||this.state.reduced||actor.unseal)return;
+    const color=role==='king'?0xffc361:0xc0edff;
+    const surfaces:Unseal['surfaces']=new Map();
+    actor.model.traverse(o=>{
+      if(!(o instanceof T.Mesh)||!(o.material instanceof T.MeshStandardMaterial))return;
+      const m=o.material;
+      if(m.userData.scope==='base'||(role==='guard'&&m.metalness<.4)||surfaces.has(m))return;
+      surfaces.set(m,{color:m.emissive.clone(),intensity:m.emissiveIntensity});
+    });
+    actor.unseal={start:now,color,surfaces};
+    this.fx.unseal(actor.group.position,actor.facing+actor.model.rotation.y,role,now);
+    this.dirty=true;
+  }
   private syncEffects(state:SceneState,rites:Rites|undefined,now:number){
     const tr=this.transition;const pieces=state.pieces.map(p=>tr?.publicBeats.reveals.some(r=>r.id===p.id&&!tr.impacts.has(r.step))?tr.beforePieces.find(b=>b.id===p.id)??p:p);
     for(const v of tr?.victims??[])if(!tr!.impacts.has(v.index)){const p=tr!.beforePieces.find(p=>p.id===v.id);if(p&&!pieces.some(b=>b.id===p.id))pieces.push(p);}
@@ -297,16 +316,32 @@ export class BoardScene {
     const tr=this.transition;this.transition=null;if(!tr)return;
     this.executionShade.style.opacity='0';this.executionLamp.intensity=0;
     this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){drawStance(pose);}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
-    for(const v of tr.victims)this.removeActor(v.id,v.actor);
+    for(const v of tr.victims){
+      if(v.fracture)this.disposeGroup(v.fracture);
+      this.removeActor(v.id,v.actor);
+    }
+    this.renderer.shadowMap.needsUpdate=true;
     if(!completed||tr.silent){this.audioQueue=this.audioQueue.filter(c=>c.options.group!==tr.groupKey);this.onBattleCancel?.(tr.groupKey);}
     if(completed)this.fx.clearAction();else this.fx.clearTransient();
-    this.clearCameraImpulse();tr.finish(completed);
+    this.clearCameraImpulse();
+    // Give the final rendered pose a frame before React mounts the capture card.
+    if(completed&&tr.execution&&!tr.silent&&this.debugActionProgress===null&&!document.hidden){
+      requestAnimationFrame(()=>tr.finish(true));
+    }else tr.finish(completed);
   }
   private clearCameraImpulse(){this.cameraImpulse=null;if(this.cameraBase.lengthSq()){this.camera.position.copy(this.cameraBase);this.camera.lookAt(0,-.05,0);this.camera.updateMatrixWorld();}}
   private stepMove(now:number){
-    const tr=this.transition;if(!tr)return;this.dirty=true;this.renderer.shadowMap.needsUpdate=true;
+    const tr=this.transition;if(!tr)return;this.dirty=true;
+    if(this.renderer.shadowMap.enabled&&now-this.lastMotionShadow>=72){
+      this.renderer.shadowMap.needsUpdate=true;this.lastMotionShadow=now;
+    }
     if(this.actors.get(tr.id)!==tr.actor){this.cancelMove();return;}
     const progress=Math.max(tr.lastProgress,clamp((now-tr.start)/tr.duration));tr.lastProgress=progress;
+    // Split one visible statue per frame in the wind-up, ahead of either hit.
+    if(tr.execution&&!tr.line.reduced&&!tr.silent&&progress<drawStart){
+      const waiting=tr.victims.find(v=>!v.fracture&&!v.actor.disposed);
+      if(waiting)waiting.fracture=this.fx.prepareFracture(waiting.actor.model);
+    }
     const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,step=tr.steps[index],from=index?cellToWorld(tr.steps[index-1].x,tr.steps[index-1].y,.18):tr.from,to=cellToWorld(step.x,step.y,.18),dir=to.clone().sub(from).setY(0).normalize(),actor=tr.actor;
     actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=sample.lift+tr.startLift*(1-smooth(progress/.28));
     actor.model.rotation.z=0;
@@ -331,9 +366,10 @@ export class BoardScene {
         const victim=tr.victims.find(v=>v.index===cue.index);
         if(beat&&victim&&!victim.disclosed){
           victim.disclosed=true;
-          if(!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
-          if(fresh&&tr.execution&&!tr.line.reduced&&!victim.actor.disposed){
-            this.fx.fracture(victim.actor.model,dir,at);
+          if(!tr.execution&&!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
+          if(fresh&&tr.execution&&victim.fracture&&!victim.actor.disposed){
+            this.fx.fracture(victim.fracture,dir,at);
+            victim.fracture=undefined;
             victim.actor.model.visible=false;
           }
           if(fresh&&!tr.execution&&!tr.line.reduced)this.fx.ash(victim.at,dir,at);
@@ -346,7 +382,10 @@ export class BoardScene {
         const victim=tr.victims.find(v=>v.index===i);
         if(!victim)continue;
         const reveals=tr.publicBeats.reveals.filter(r=>r.step===i);
-        for(const reveal of reveals)this.revealActor(reveal.id,reveal.role);
+        for(const reveal of reveals){
+          if(fresh)this.unsealActor(reveal.id,reveal.role,at);
+          else this.revealActor(reveal.id,reveal.role);
+        }
         if(reveals.length)tr.ceremonyCommitted=true;
         const rites=tr.ceremonyCommitted?tr.pendingState?.ritual:tr.beforeRites;
         if(tr.pendingState)this.syncEffects(tr.pendingState,rites,now);
@@ -369,11 +408,14 @@ export class BoardScene {
       const fall=tr.execution||tr.line.reduced||v.actor.role==='unknown'?0:1.22*smooth((age-.03)/.69);
       v.actor.group.rotation.set(dir.z*(.13*kick+fall),0,-dir.x*(.13*kick+fall));
       if(v.actor.rig&&!tr.execution&&v.actor.role!=='unknown')poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
-      if(progress<discloseAt)continue;
+      if(progress<discloseAt||!v.actor.model.visible)continue;
       (v.actor.rune.material as T.MeshBasicMaterial).opacity=.25*(1-age);
       v.actor.model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}const start=tr.execution?0:m.userData.scope==='base'?.58:m.userData.scope==='crown'?.35:.18;m.opacity=1-smooth(clamp((age-start)/(.98-start)));}});
     }
-    if(progress>=1){if(tr.pendingState&&!tr.ceremonyCommitted)this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);if(this.lastAttack)this.lastAttack.dissolved=true;this.cancelMove(true);}
+    const effectStillPlaying=tr.victims.length>0&&!tr.silent&&this.fx.transients.some(effect=>
+      (effect.kind==='fracture'||effect.kind==='unseal')&&effect.start>=tr.start&&now<effect.start+effect.life
+    );
+    if(progress>=1&&!effectStillPlaying){if(tr.pendingState&&!tr.ceremonyCommitted)this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);if(this.lastAttack)this.lastAttack.dissolved=true;this.cancelMove(true);}
   }
   effect(x:number,y:number,role:VisibleRole){this.fx.impact(x,y,role,new T.Vector3(0,0,-1),this.state.reduced);this.dirty=true;}
   rotate() { this.desiredAngle += Math.PI / 2; }
@@ -442,12 +484,16 @@ export class BoardScene {
     if(this.state.viewer===null&&this.state.active){this.audioQueue=[];this.lastCamera=now;this.dirty=false;return;}
     const speed = this.state.reduced ? 1 : 1 - Math.exp(-Math.min((now-this.lastCamera)/1000,.25) * 7); this.lastCamera=now;
     this.angle += (this.desiredAngle - this.angle) * speed; this.zoom += (this.desiredZoom - this.zoom) * speed;
+    // Camera fit only changes during orbit, zoom, or a layout change.
+    if(Math.abs(this.angle-this.desiredAngle)<.0008)this.angle=this.desiredAngle;
+    if(Math.abs(this.zoom-this.desiredZoom)<.001)this.zoom=this.desiredZoom;
+    const fitKey=[this.angle,this.zoom,this.camera.aspect,this.state.active].join('/');
     const aspect = this.camera.aspect, fit = aspect < .85 ? 1.28 : aspect < 1.1 ? 1.12 : 1;
-    let distance = (this.state.active ? 14.7 : 10.8) * fit / this.zoom;
+    let distance=fitKey===this.cameraFitKey?this.cameraFitDistance:(this.state.active?14.7:10.8)*fit/this.zoom;
 
 
     this.camera.position.set(Math.sin(this.angle) * distance * .78, distance * .83, Math.cos(this.angle) * distance * .78); this.camera.lookAt(0, -.05, 0);
-    if(this.state.active){
+    if(this.state.active&&fitKey!==this.cameraFitKey){
       for(let iteration=0;iteration<3;iteration++){
         this.camera.updateMatrixWorld(true);let overflow=1;
         for(const x of [-3.6,3.6])for(const z of [-3.6,3.6])for(const y of [.05,1.85]){
@@ -457,11 +503,23 @@ export class BoardScene {
         this.camera.position.set(Math.sin(this.angle)*distance*.78,distance*.83,Math.cos(this.angle)*distance*.78);this.camera.lookAt(0,-.05,0);
       }
     }
+    this.cameraFitKey=fitKey;this.cameraFitDistance=distance;
     this.cameraBase.copy(this.camera.position);
 
     for (const [id, actor] of this.actors) {
       const piece=this.state.pieces.find(p=>p.id===id);
-      if(actor.revealStarted&&now-actor.revealStarted>700)actor.revealStarted=undefined;
+      if(actor.unseal){
+        // Animated actor materials are private and bypass the instance pool.
+        const {start,color,surfaces}=actor.unseal,age=clamp((now-start)/620);
+        const tint=new T.Color(color);
+        const glow=Math.sin(Math.PI*Math.sqrt(age))*(actor.role==='king'?1.3:.72+.23*Math.cos(age*Math.PI*8));
+        for(const [surface,base] of surfaces){
+          surface.emissive.copy(base.color);
+          surface.emissiveIntensity=base.intensity;
+          if(age<1){surface.emissive.lerp(tint,Math.min(1,glow));surface.emissiveIntensity+=glow;}
+        }
+        if(age>=1)actor.unseal=undefined;
+      }
       if(this.transition?.id===id||this.transition?.victims.some(v=>v.id===id))continue;
       actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&actor.role!=='unknown'&&this.state.selected===id ? .032 : 0;
       actor.model.position.y=T.MathUtils.damp(actor.model.position.y,selectedLift,22,dt);

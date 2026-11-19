@@ -11,7 +11,7 @@ function floor(parent:T.Object3D,geometry:T.BufferGeometry,color:number,opacity:
 function ring(parent:T.Object3D,r:number,width:number,color:number,opacity:number,y=.16){return floor(parent,new T.RingGeometry(r,r+width,64),color,opacity,0,0,y);}
 function strip(parent:T.Object3D,x1:number,z1:number,x2:number,z2:number,width:number,color:number,opacity:number,y=.16){const m=floor(parent,new T.PlaneGeometry(width,Math.hypot(x2-x1,z2-z1)),color,opacity,(x1+x2)/2,(z1+z2)/2,y);m.rotation.z=-Math.atan2(x2-x1,z2-z1);return m;}
 function dispose(group:T.Object3D){const mats=new Set<T.Material>();group.traverse(o=>{if(o instanceof T.Mesh||o instanceof T.Line){if(o instanceof T.InstancedMesh)o.dispose();o.geometry.dispose();for(const m of(Array.isArray(o.material)?o.material:[o.material]))mats.add(m);}});mats.forEach(m=>m.dispose());group.removeFromParent();}
-type Transient={group:T.Group;start:number;life:number;kind:'fracture'|'ash'|'impact'|'collapse'|'open'|'occupy';direction?:T.Vector3;reduced?:boolean};
+type Transient={group:T.Group;start:number;life:number;kind:'unseal'|'fracture'|'ash'|'impact'|'collapse'|'open'|'occupy';direction?:T.Vector3;reduced?:boolean};
 const tint=(role:VisibleRole)=>role==='king'?GOLD:role==='guard'?SILVER:role==='martyr'?PURPLE:0xb8c3cb;
 export class BattleEffects{
  altar=new T.Group();charges=new Map<string,T.Group>();royalMarks=new Map<string,T.Group>();preview=new T.Group();action:T.Group|null=null;transients:Transient[]=[];
@@ -208,8 +208,9 @@ export class BattleEffects{
   }
   this.push({group:g,start:now,life:reduced?180:360,kind:'impact',direction:direction.clone().normalize(),reduced});
  }
- fracture(model:T.Group,direction:T.Vector3,now:number){
-  const group=cutFragments(model,this.root);this.root.add(group);
+ prepareFracture(model:T.Group){return cutFragments(model,this.root);}
+ fracture(group:T.Group,direction:T.Vector3,now:number){
+  this.root.add(group);
   this.push({group,start:now,life:330,kind:'fracture',direction:direction.clone()});
  }
  ash(position:T.Vector3,direction:T.Vector3,now:number){
@@ -217,6 +218,25 @@ export class BattleEffects{
   const ash=new T.InstancedMesh(new T.OctahedronGeometry(1),material(0xc1b6aa,.52),this.particleBudget);
   ash.name='ash';ash.frustumCulled=false;group.add(ash);
   this.push({group,start:now,life:390,kind:'ash',direction:direction.clone()});
+ }
+ unseal(origin:T.Vector3,yaw:number,role:'king'|'guard',now:number){
+  const group=new T.Group();
+  group.position.copy(origin).setY(0);group.rotation.y=yaw;
+  const color=role==='king'?GOLD:SILVER;
+  ring(group,.37,.045,color,.92,.19);
+  ring(group,.53,.018,color,.56,.20);
+  // Two curved pieces of the dark seal peel away from the revealed armour.
+  for(const side of [-1,1]){
+   const cloth=new T.Shape();
+   cloth.moveTo(0,1.47);cloth.quadraticCurveTo(side*.27,1.28,side*.29,.95);
+   cloth.lineTo(side*.47,.27);cloth.quadraticCurveTo(side*.24,.38,0,.30);
+   cloth.quadraticCurveTo(side*.13,.95,0,1.47);
+   const veil=new T.Mesh(new T.ShapeGeometry(cloth),material(0x182638,.86));
+   veil.name='shed-veil';veil.userData.side=side;group.add(veil);
+  }
+  const rays=new T.InstancedMesh(new T.OctahedronGeometry(1),material(color,.92),role==='king'?8:6);
+  rays.name='unseal-rays';rays.frustumCulled=false;group.add(rays);
+  this.root.add(group);this.push({group,start:now,life:620,kind:'unseal'});
  }
  crownStrike(origin:T.Vector3,now:number){
   const group=new T.Group();group.position.copy(origin).setY(0);this.root.add(group);
@@ -256,7 +276,21 @@ export class BattleEffects{
    g.rotation.y=reduced?0:now*.00045;
   }
   this.transients=this.transients.filter(t=>{const age=T.MathUtils.clamp((now-t.start)/t.life,0,1);if(age>=1){dispose(t.group);return false;}const fade=1-age;
-   t.group.children.forEach(o=>{const m=o as T.Mesh,mat=m.material as T.MeshBasicMaterial;if(m.name==='cut-fragment'){
+   t.group.children.forEach(o=>{const m=o as T.Mesh,mat=m.material as T.MeshBasicMaterial;if(m.name==='shed-veil'){
+     const side=m.userData.side;
+     m.position.set(side*.64*age,.34*age,.35);m.rotation.set(-age*.95,side*.8*age,-side*age);
+     mat.opacity=.86*(1-T.MathUtils.smoothstep(age,.15,.82));
+    }else if(m.name==='unseal-rays'&&m instanceof T.InstancedMesh){
+     const ray=new T.Object3D();
+     for(let i=0;i<m.count;i++){
+      const angle=i*2.4,r=.33+age*.48;
+      ray.position.set(Math.cos(angle)*r,.32+(i%4)*.27+age*.44,Math.sin(angle)*r);
+      ray.rotation.set(.28,angle,.28);
+      ray.scale.set(.033,.22*(1-age)+.04,.033);
+      ray.updateMatrix();m.setMatrixAt(i,ray.matrix);
+     }
+     m.instanceMatrix.needsUpdate=true;mat.opacity=.92*fade;
+    }else if(m.name==='cut-fragment'){
      const i=m.userData.band,dir=t.direction!,spread=[.13,.82,-.73,-.41,.50][i];
      m.position.copy(m.userData.pivot).addScaledVector(dir,age*(.22+.08*i));
      m.position.x-=dir.z*spread*age;m.position.z+=dir.x*spread*age;

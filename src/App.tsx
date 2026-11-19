@@ -85,6 +85,7 @@ export default function App() {
         return {...board,pieces,ritual};
       });
       scene.current.onPublicCapture=c=>{
+        if(c.execution)return;
         setImpactDisclosure(c);
         setMotionBoard(board=>board?{...board,captures:[...board.captures,c]}:board);
       };
@@ -177,7 +178,8 @@ export default function App() {
     const actor=game.pieces.find(p=>p.id===id)!,caps=next.captures.slice(game.captures.length),token=++turnSequence.current;
     const exposed=actor.revealed||action.kind==='charge'||action.kind==='execute';
     const visibleRole=actor.side===viewer||exposed?actor.role:'unknown';
-    if(exposed)scene.current?.revealActor(id,actor.role);
+    if(action.kind==='charge'&&!actor.revealed)scene.current?.unsealActor(id,'guard');
+    else if(exposed)scene.current?.revealActor(id,actor.role);
     const steps=ritualMode?next.lastAction!.steps:[{x,y,...(caps.length?{victimId:game.pieces.find(p=>p.x===x&&p.y===y)?.id}:{})}];
     const motion=scene.current?.animatePath(id,visibleRole,steps,prefs.reduced,action.kind==='execute',{charge:action.kind==='charge',publicBeats:publicBeats(next,game.captures.length,steps)});
     setMotionBoard(game);
