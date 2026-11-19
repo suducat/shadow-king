@@ -367,8 +367,9 @@ export class BoardScene {
         if(beat&&victim&&!victim.disclosed){
           victim.disclosed=true;
           if(!tr.execution&&!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
-          if(fresh&&tr.execution&&victim.fracture&&!victim.actor.disposed){
-            this.fx.fracture(victim.fracture,dir,at);
+          if(fresh&&tr.execution&&!tr.line.reduced&&!victim.actor.disposed){
+            // A sparse frame sequence can skip the wind-up preparation.
+            this.fx.fracture(victim.fracture??this.fx.prepareFracture(victim.actor.model),dir,at);
             victim.fracture=undefined;
             victim.actor.model.visible=false;
           }
