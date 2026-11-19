@@ -38,13 +38,25 @@ const {launch,openGame,holdFrame}=require('./support.cjs');
   await button('暗王主菜单').click();await button('返回主菜单').click();
   await page.getByRole('button',{name:/开启棋局/}).click();
   await page.getByRole('button',{name:/人机对战/}).click();
+  const silhouettes=new Set(),gestures=new Set();
   for(const [name,id] of [['棋侍','easy'],['影谋','normal'],['诡相','hard'],['无冕者','master'],['全知者','omniscient']]){
    await page.getByRole('button',{name:new RegExp(name)}).click();
-   const figure=page.locator(`.opponent-figure[data-rank="${id}"] img`);
-   assert.equal(await figure.evaluate(async e=>{await e.decode();return getComputedStyle(e).animationDuration;}),'0.5s');
+   const entrance=page.locator(`.opponent-entrance[data-rank="${id}"]`);
+   const figure=await entrance.evaluate(svg=>{
+    const prop=svg.querySelector('.entrance-prop');
+    const animation=getComputedStyle(prop);
+    return {silhouette:svg.querySelector('.entrance-cloth').getAttribute('d'),
+      duration:animation.animationDuration,gesture:animation.animationName};
+   });
+   assert.equal(figure.duration,'0.5s');
+   silhouettes.add(figure.silhouette);gestures.add(figure.gesture);
+   await entrance.screenshot({path:dir+`/entrance-${id}.png`,animations:'disabled'});
   }
+  assert.equal(silhouettes.size,5);assert.equal(gestures.size,5);
   assert.equal(await page.locator('#omniscient-disclosure').count(),1);
   await page.screenshot({path:dir+'/opponent.png'});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.locator('.entrance-prop').evaluate(e=>getComputedStyle(e).animationName),'none');
   assert.deepEqual(errors,[]);console.log('PASS altar mantle, indexed shatter, execution shade cleanup, published ghosts and five portraits');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

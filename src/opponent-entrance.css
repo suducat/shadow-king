@@ -1,0 +1,86 @@
+.opponent-entrance {
+  --entrance-length: 500ms;
+  display: block;
+  width: min(100%, 330px);
+  aspect-ratio: 348 / 264;
+  margin: 0 auto 12px;
+  mask-image: linear-gradient(black 74%, transparent 100%);
+}
+.entrance-cloth,
+.entrance-solid,
+.entrance-metal,
+.entrance-face {
+  stroke: currentColor;
+  stroke-linejoin: round;
+}
+.entrance-cloth { fill: #10141d; stroke-width: 1.15; stroke-opacity: .77; }
+.entrance-solid { fill: #0a0d16; stroke-width: .98; stroke-opacity: .8; }
+.entrance-face { fill: color-mix(in srgb, currentColor 18%, #0e131d); stroke-width: .76; stroke-opacity: .73; }
+.entrance-metal { fill: color-mix(in srgb, currentColor 22%, #111625); stroke-width: 1.05; }
+.entrance-bright { fill: currentColor; }
+.entrance-shade { fill: currentColor; opacity: .13; }
+.entrance-feature { fill: currentColor; opacity: .72; }
+.entrance-rim {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .75;
+}
+.entrance-accent { opacity: .46; }
+.entrance-actor,.entrance-prop,.entrance-sigil,.entrance-light { transform-origin: center; }
+.entrance-actor { animation: entrance-arrive var(--entrance-length) cubic-bezier(.2,.72,.28,1) both; }
+.entrance-light { animation: entrance-light var(--entrance-length) ease-out both; }
+.entrance-sigil { animation: entrance-sigil var(--entrance-length) ease-out both; }
+.entrance-prop {
+  transform-box: fill-box;
+  animation-duration: var(--entrance-length);
+  animation-timing-function: cubic-bezier(.2,.85,.25,1);
+  animation-fill-mode: both;
+}
+.opponent-entrance[data-rank="easy"] .entrance-prop { animation-name: entrance-present; }
+.opponent-entrance[data-rank="normal"] .entrance-prop {
+  transform-origin: 18% 90%;
+  animation-name: entrance-draw;
+}
+.opponent-entrance[data-rank="hard"] .entrance-prop {
+  transform-origin: 77% 88%;
+  animation-name: entrance-fan;
+}
+.opponent-entrance[data-rank="master"] .entrance-prop { animation-name: entrance-crown; }
+.opponent-entrance[data-rank="omniscient"] .entrance-actor { animation-name: entrance-unveil; }
+.opponent-entrance[data-rank="omniscient"] .entrance-prop { animation-name: entrance-eye; }
+
+@keyframes entrance-arrive { from { opacity: .18; transform: translateY(11px); } }
+@keyframes entrance-light { 0% { opacity: 0; } 54% { opacity: 1; } 100% { opacity: .86; } }
+@keyframes entrance-sigil {
+  0% { opacity: 0; transform: scale(.8) rotate(-11deg); }
+  60% { opacity: .64; }
+  100% { opacity: .48; }
+}
+@keyframes entrance-present { from { opacity: .22; transform: translateY(21px); } }
+@keyframes entrance-draw {
+  0% { opacity: .24; transform: rotate(57deg) translateY(10px); }
+  72% { transform: rotate(-5deg); }
+}
+@keyframes entrance-fan {
+  0% { opacity: .25; transform: rotate(17deg) scaleX(.19); }
+  74% { transform: rotate(-4deg); }
+}
+@keyframes entrance-crown {
+  0% { opacity: 0; transform: translateY(-27px); }
+  75% { opacity: 1; }
+}
+@keyframes entrance-unveil {
+  0% { opacity: .2; clip-path: inset(46% 0 46% 0); }
+  100% { clip-path: inset(0); }
+}
+@keyframes entrance-eye {
+  0%,24% { opacity: 0; transform: scaleY(.06); }
+  76% { opacity: 1; transform: scaleY(1.07); }
+}
+@media (max-width: 700px) { .opponent-entrance { width: min(100%, 258px); } }
+@media (prefers-reduced-motion: reduce) {
+  .opponent-entrance * { animation: none; }
+}
