@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>王庭画面对照 · 暗王</title>
+<style>
+:root{color-scheme:dark;background:#10191f;color:#e3ddd0;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0}main{max-width:1460px;margin:auto;padding:clamp(16px,3vw,48px)}a{color:#ddc497;text-underline-offset:4px}h1,h2{font-family:Georgia,"Songti SC",serif;font-weight:500}h1{font-size:clamp(30px,4vw,50px);margin:24px 0 8px}h2{font-size:26px;margin:30px 0 12px}p{color:#c0c5c1;font-size:15px;line-height:1.7;margin:6px 0 16px}.filters,.pair{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.pair{align-items:flex-start}.pair figure{flex:1 1 300px;min-width:0;margin:0}figcaption{font-size:14px;color:#d4bd93;padding:12px 0 7px}img,video{max-width:100%;width:100%;height:auto;display:block;background:#0b1013;border:1px solid #a9957152}.phone img{width:min(100%,390px)}video{aspect-ratio:670/430}.filters label{color:#bcc3c1;font-size:14px;display:flex;align-items:center;gap:8px}select,button{min-height:44px;border:1px solid #a493705c;background:#202b30;color:#eee4cd;font:inherit;padding:6px 12px}button{cursor:pointer}a:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid #ebcb88;outline-offset:3px}section{margin-top:20px}figure>a{display:block;font-size:14px;margin-top:6px}#notes{border-top:1px solid #a9957144;margin-top:24px;padding-top:12px}@media(max-width:640px){.pair{display:grid;grid-template-columns:minmax(0,1fr)}}
+</style></head>
+<body><main><a href="../../">返回《暗王》</a><h1>永夜王庭 · 画面对照</h1>
+<p>左侧为 Pages #15，右侧为本次更新。手机上按相同顺序上下排列。</p>
+<section><h2>界面</h2><div class="filters"><label>场景<select id="scene"><option value="home">大厅</option><option value="classic">经典选择</option><option value="rite">祭典选择</option><option value="ai">AI 选择 · 诡相</option><option value="play">对局</option></select></label>
+<label>视口<select id="viewport"><option value="1440">桌面 1440 × 900</option><option value="390">手机 390 × 844</option></select></label></div>
+<div id="shots" class="pair"></div></section>
+<section id="combat"><h2>棋盘演出</h2><div class="filters"><label>事件<select id="event"><option value="move">普通落子</option><option value="capture">影卫吃子</option><option value="rite">祭典开启</option></select></label><button id="together" type="button">同时重播</button></div>
+<p>两版使用同一测试局面和固定镜头。带帧号的短片按动作时钟每秒采样 30 帧，下方另附带游戏原声的实时录屏。</p>
+<div id="films" class="pair"></div><p id="frames"></p></section><p id="notes">截图使用 Chromium，缩放 100%，低画质；截图开启减少动态效果。录屏使用 1080 × 720 窗口，标准动作，取棋盘画布。手机视口采用触控模拟。</p></main>
+<script>
+const el=id=>document.getElementById(id);
+const versions=[['15','Pages #15'],['new','新版']];
+function photos(){
+ const scene=el('scene'),size=el('viewport').value;
+ el('shots').classList.toggle('phone',size==='390');
+ el('shots').replaceChildren(...versions.map(([id,label])=>{
+  const f=document.createElement('figure'),caption=document.createElement('figcaption'),a=document.createElement('a'),img=document.createElement('img');
+  caption.textContent=label;img.src=id+'/'+size+'/'+scene.value+'.webp';img.alt=label+' · '+scene.selectedOptions[0].textContent+'截图';img.width=Number(size);img.height=size==='390'?844:900;a.href=img.src;a.append(img);f.append(caption,a);return f;
+ }));
+}
+function movies(){
+ const name=el('event').value;
+ el('frames').textContent=name==='move'?'F0 起步，F14 基座接触目标格。':name==='capture'?'F8 发力，F16 命中，F18 揭示身份，F24 落定。':'F16 击中最后一名死士并触发祭典，F18 揭示被吃身份，F24 攻击者落定。';
+ el('films').replaceChildren(...versions.map(([id,label])=>{
+  const f=document.createElement('figure'),caption=document.createElement('figcaption'),v=document.createElement('video'),a=document.createElement('a');
+  caption.textContent=label;v.controls=true;v.playsInline=true;v.preload='metadata';v.src=id+'/'+name+'.mp4';v.setAttribute('aria-label',label+'逐帧短片');a.href=id+'/'+name+'.webm';a.textContent='播放带原声的实时录屏';f.append(caption,v,a);return f;
+ }));
+}
+el('scene').onchange=el('viewport').onchange=photos;el('event').onchange=movies;
+el('together').onclick=()=>{for(const v of document.querySelectorAll('video')){v.currentTime=0;v.play().catch(()=>{});}};
+photos();movies();
+</script></body></html>

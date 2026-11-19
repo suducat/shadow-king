@@ -4,9 +4,9 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
 const [stage, dist = 'dist-test'] = process.argv.slice(2);
-assert.ok(['before','after'].includes(stage));
+assert.ok(['before','after','night15','night-new'].includes(stage));
 const out = 'artifacts/motion/' + stage;
-const cases = ['move','capture','execution'];
+const cases = process.argv.length>4 ? process.argv.slice(4) : ['move','capture','execution'];
 const fps = 30;
 (async () => {
  const browser = await launch();
@@ -18,7 +18,7 @@ const fps = 30;
    const folder=out+'/'+name;
    fs.mkdirSync(folder,{recursive:true});
    const select = async(hold) => {
-    await page.evaluate(({name,hold})=>{const q=window.__SK_QA__;q.holdAction(hold);return name==='execution'?q.loadRitualFixture('ready'):q.loadFixture('capture','guard');},{name,hold});
+    await page.evaluate(({name,hold})=>{const q=window.__SK_QA__;q.holdAction(hold);return name==='rite'?q.loadRitualFixture('opening'):name==='execution'?q.loadRitualFixture('ready'):q.loadFixture('capture','guard');},{name,hold});
     await page.waitForSelector('canvas[data-ready=true]');
     await click(3,3,.8);
    };
