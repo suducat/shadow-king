@@ -4,4 +4,5 @@ import './styles.css';
 import './polish.css';
 import './combat.css';
 import './render.css';
+import './combat-polish.css';
 createRoot(document.getElementById('root')!).render(<App/>);

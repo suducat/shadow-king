@@ -11,12 +11,15 @@ export function combatFrame(scene:BoardScene){
   position:tr?.actor.group.position.toArray(),body:tr?.actor.rig?.body.rotation.toArray(),legs:tr?.actor.rig?[tr.actor.rig.leftLeg.rotation.x,tr.actor.rig.rightLeg.rotation.x]:[],
   tip:tr?.actor.rig?.weapon.localToWorld(new T.Vector3().fromArray(tr.actor.rig.weapon.userData.contact)).toArray(),
   victims:tr?.victims.map(v=>({id:v.id,role:v.actor.role,disposed:v.actor.disposed,disclosed:v.disclosed,opacity:Math.min(...modelState(scene).filter(a=>a.id===v.id).map(a=>a.zeroOpacity))})),
+  activeSlash:scene.fx.action?.children.filter(o=>o.name==='blade-crescent'&&o.visible).map(o=>o.userData.step)??[],
+  particles:scene.fx.transients.flatMap(t=>t.group.children.map(o=>o.name).filter(Boolean)),
+  mantle:[...scene.fx.royalMarks.values()].some(g=>!!g.getObjectByName('altar-mantle')),
   memory:{...scene.renderer.info.memory},render:{...scene.renderer.info.render},fx:scene.fx.transients.length,action:!!scene.fx.action,states:modelState(scene),cues:scene.cueLog.slice(-20)};
 }
 export async function combatProbe(scene:BoardScene){
  const failures:string[]=[],contacts:{role:string;direction:number[];distance:number}[]=[],privacy:unknown[]=[],memory:unknown[]=[];let checks=0,actions=0;
  const check=(ok:boolean,label:string)=>{checks++;if(!ok)failures.push(label);};
- const step=(progress:number)=>{const tr=scene.transition!;(scene as unknown as{stepMove(n:number):void}).stepMove(tr.start+tr.duration*progress);};
+ const step=(progress:number)=>{const tr=scene.transition;if(!tr)return;(scene as unknown as{stepMove(n:number):void}).stepMove(tr.start+tr.duration*progress);};
  const update=(g:Game,viewer:'red'|'blue'='red')=>scene.update({pieces:viewFor(g,viewer),viewer,selected:null,legal:[],cinematic:true,reduced:false,deployment:false,active:true,mode:g.mode??'classic',ritual:g.ritual});
  const healthy=()=>modelState(scene).every(a=>a.visible&&!a.zeroOpacity&&!a.disposed&&!a.hidden&&a.scale.every(n=>n===1)&&a.modelScale.every(n=>n===1));
  const off=scene.onPublicCapture;let disclosed=0;scene.onPublicCapture=()=>disclosed++;
@@ -31,9 +34,9 @@ export async function combatProbe(scene:BoardScene){
   const target=new T.Vector3(3+dx-3,1.1,3+dy-3),distance=Math.hypot(tip.x-target.x,tip.z-target.z);contacts.push({role,direction:[dx,dy],distance});if(role==='guard'||role==='king')check(distance<.28,`guard blade contact ${distance}`);
   const body=actor.rig!.body.rotation.clone();step(.58+tr.line.hold*.7);check(Math.abs(actor.rig!.body.rotation.x-body.x)+Math.abs(actor.rig!.body.rotation.y-body.y)+Math.abs(actor.rig!.body.rotation.z-body.z)<1e-9,`contact hold ${role}`);
   const victim=tr.victims[0];
-  check(victim.actor.role==='unknown'&&!victim.disclosed&&victim.actor.group.position.distanceTo(victim.at)>.005,`sealed recoil before disclosure ${role}/${dx}/${dy}`);
+  check(victim.actor.role==='unknown'&&!victim.disclosed&&victim.actor.group.position.distanceTo(victim.at)<.0001,`sealed victim stays still before disclosure ${role}/${dx}/${dy}`);
   step(.58+disclosureDelay(tr.duration)+.001);
-  check(victim.disclosed&&victim.actor.role===v.role&&!victim.actor.disposed,`public model after recoil ${role}/${dx}/${dy}`);
+  check(victim.disclosed&&victim.actor.role===v.role&&!victim.actor.disposed,`public model after disclosure ${role}/${dx}/${dy}`);
   step(1.1);await p;actions++;check(healthy()&&!scene.actors.has(v.id),`capture settled ${role}`);
  }
  for(const role of ['king','guard','martyr'] as const){

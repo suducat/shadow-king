@@ -9,7 +9,7 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
  if(kind==='select')return[tone(392,.11,.12),tone(588,.17,.045,588,'sine',.025)];
  if(kind==='turn')return[tone(146.83,.24,.09),tone(220,.3,.05,220,'sine',.06)];
  if(kind==='reveal')return[tone(174.61,.36,.12),tone(349.23,.45,.065,349.23,'sine',.06)];
- if(kind==='charge'||kind==='charge-complete')return[tone(196,.5,.09,294),tone(588,.3,.045,440,'sine',.08)];
+ if(kind==='charge'||kind==='charge-complete')return[grain(2650,.18,.075),tone(680,.32,.07,1420,'triangle'),tone(1568,.16,.055,1175,'sine',.09)];
  if(kind.startsWith('rite-')){const base=kind==='rite-break'?98:kind==='rite-occupy'?146.83:130.81;return[tone(base,.65,.13,base*.8),tone(base*1.5,.7,.07,base*1.5,'sine',.05),grain(480,.16,.08)];}
  if(kind.startsWith('end-')){
   const [,reason,part='gather']=kind.split('-'),base=reason==='martyr'?130.81:reason==='ritual'?146.83:reason==='guard'?110:reason==='resign'?98:73.42;
@@ -20,6 +20,8 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
  }
  const parts=kind.split('-'),role:VisibleRole=kind.startsWith('execution-')?'guard':(['king','guard','martyr','unknown'].includes(parts[1])?parts[1]:'unknown') as VisibleRole;
  const stage=kind.startsWith('execution-')?parts[1]:parts.at(-1);
+ if(kind==='execution-release')return[grain(3150,.13,.09),tone(990,.32,.075,1820,'triangle'),tone(1975,.19,.028,2200)];
+ if(kind==='execution-dash')return[grain(4100,.16,.13),tone(1420,.13,.06,690),tone(770,.12,.031,310)];
  if(stage==='windup'||stage==='release'||stage==='dash'){
   if(role==='guard')return[grain(stage==='dash'?1800:1300,.11,.09),tone(740,.16,.04,980)];
   if(role==='king')return[tone(98,.24,.1,130.81),tone(392,.18,.035)];
@@ -29,13 +31,15 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
  if(stage==='impact'){
   const base=role==='king'?58:role==='guard'?84:role==='martyr'?72:70,material=options.material==='guard'?1600:options.material==='king'?1100:550;
   const layers=[tone(base,.17,.24,base*.65),grain(material,.105,.21)];
-  if(role==='guard')layers.push(tone(890,.25,.08,840),tone(1174,.17,.035));
-  if(role==='king')layers.push(tone(294,.36,.08),tone(440,.25,.045));
-  if(role==='martyr')layers.push(tone(261,.32,.09),tone(392,.4,.05,294));
+  if(role==='guard')layers.push(tone(1350,.2,.09,1190,'triangle'),grain(3600,.065,.09));
+  if(role==='king')layers.push(tone(588,.32,.085,530,'triangle'),grain(2400,.06,.10));
+  if(role==='martyr')layers.push(tone(196,.34,.09,76),tone(785,.38,.055,410,'triangle'),grain(700,.19,.07));
+  if(kind==='execution-impact')layers.push(grain(4500,.1,.13),tone(1860,.19,.035,1530));
   if(options.decisive)layers.push(tone(49,.24,.095,36));
   return layers;
  }
- if(stage==='plant')return[grain(1450,.032,.14),tone(role==='king'?79:102,.10,.14,51),grain(285,.085,.08)];
+ if(stage==='plant')return[grain(530,.09,.11),tone(87,.095,.14,48)];
+ if(stage==='slide')return[grain(740,.20,.11),grain(325,.17,.10)];
  if(stage==='charged')return[tone(294,.3,.09,588),tone(880,.24,.04,660)];
  if(stage==='recover')return[tone(role==='guard'?440:196,.16,.025,146.83)];
  return[tone(146.83,.15,.055)];

@@ -1,13 +1,13 @@
 import {coord,type Capture,type Game,type VisibleRole} from './game';
 import type {ActionStep} from './ritual';
-export type BattleCue={kind:'windup'|'release'|'dash'|'impact'|'plant'|'disclose'|'charged'|'recover';at:number;index?:number};
+export type BattleCue={kind:'slide'|'windup'|'release'|'dash'|'impact'|'plant'|'disclose'|'charged'|'recover';at:number;index?:number};
 export type Timeline={duration:number;plant:number;contacts:number[];hold:number;cues:BattleCue[];role:VisibleRole;execution:boolean;attack:boolean;charge:boolean;reduced:boolean};
 export const clamp=(x:number,a=0,b=1)=>Math.min(b,Math.max(a,x));
 export const smooth=(x:number)=>{x=clamp(x);return x*x*(3-2*x);};
 const ramp=(t:number,a:number,b:number)=>smooth((t-a)/(b-a));
 export const disclosureDelay=(duration:number)=>Math.min(.10,90/duration);
 export function battleTimeline(role:VisibleRole,steps:number,execution:boolean,attack:boolean,charge=false,reduced=false):Timeline{
- steps=Math.max(1,steps);const duration=reduced?(attack||execution?240:160)*steps:execution?1080+steps*180:charge?820:attack?{king:1060,guard:880,martyr:1080,unknown:960}[role]:{king:740,guard:580,martyr:720,unknown:660}[role];
+ steps=Math.max(1,steps);const duration=reduced?(attack||execution?240:160)*steps:execution?800+steps*100:charge?820:attack?{king:1060,guard:880,martyr:1080,unknown:960}[role]:{king:740,guard:580,martyr:720,unknown:660}[role];
  const contacts=execution?Array.from({length:steps},(_,i)=>.18+(i+.72)*.66/steps):attack?[.58]:[],hold=(reduced?0:execution?32:40)/duration;
  // The sole reaches the tile at plant. The remaining time belongs to the
  // articulated figure's follow-through. Each victim gets its own recoil beat.
@@ -31,19 +31,19 @@ export function pathProgress(t:number,steps:number,execution:boolean){const trav
 // Both combat and endings use absolute, ordered, idempotent milestones. A slow
 // frame consumes every crossed cue; audio/flash freshness is a separate policy.
 export function consumeCues<T extends {at:number}>(cues:T[],emitted:Set<number>,progress:number):{cue:T;index:number}[]{const due:{cue:T;index:number}[]=[];cues.forEach((cue,index)=>{if(progress>=cue.at&&!emitted.has(index)){emitted.add(index);due.push({cue,index});}});return due;}
-export type FigurePose={heave:number;lean:number;roll:number;sway:number;weaponPitch:number;weaponRoll:number;capeDrag:number;leftArm:number;rightArm:number;leftLeg:number;rightLeg:number;sealScale:number;sealLift:number;crownLift:number;crownRoll:number};
-export const neutralPose=():FigurePose=>({heave:0,lean:0,roll:0,sway:0,weaponPitch:0,weaponRoll:0,capeDrag:0,leftArm:0,rightArm:0,leftLeg:0,rightLeg:0,sealScale:1,sealLift:0,crownLift:0,crownRoll:0});
+export type FigurePose={heave:number;lean:number;roll:number;sway:number;weaponHeight:number;weaponPitch:number;weaponRoll:number;capeDrag:number;leftArm:number;rightArm:number;leftLeg:number;rightLeg:number;sealScale:number;sealLift:number;crownLift:number;crownRoll:number};
+export const neutralPose=():FigurePose=>({heave:0,lean:0,roll:0,sway:0,weaponHeight:0,weaponPitch:0,weaponRoll:0,capeDrag:0,leftArm:0,rightArm:0,leftLeg:0,rightLeg:0,sealScale:1,sealLift:0,crownLift:0,crownRoll:0});
 export function sampleBattle(t:number,line:Timeline,steps:number){
  t=clamp(t);const path=pathProgress(t,steps,line.execution),local=line.execution?path.t:t,contact=line.execution?.72:.58,hold=line.execution?line.hold/(.66/steps):line.hold;
  const held=local<contact?local:local<contact+hold?contact:contact+(local-contact-hold)*(1-contact)/(1-contact-hold);
  let travel:number;
  if(line.reduced)travel=line.execution?ramp(local,0,1):ramp(t,0,line.plant);
- else if(line.execution){const reach=line.role==='guard'?.48:.42;travel=reach*ramp(local,0,.72)+(1-reach)*ramp(local,.72+hold,1);}
+ else if(line.execution){const reach=.48;travel=reach*ramp(local,.34,.72)+(1-reach)*ramp(local,.72+hold,1);}
  else if(line.attack){const distance={king:.43,guard:.48,martyr:.28,unknown:.42}[line.role];travel=t<contact?distance*ramp(t,.27,contact):distance+(1-distance)*ramp(t,contact+hold,line.plant);}
  else travel=ramp(t,.16,line.plant);
  const poseTime=line.attack||line.execution?held:local;
  const pose=neutralPose(),stride=Math.sin(ramp(poseTime,.12,.82)*Math.PI*2),weight=Math.sin(ramp(poseTime,.08,.88)*Math.PI),settle=Math.sin(ramp(poseTime,.68,1)*Math.PI)*(1-ramp(poseTime,.8,1));
- if(!line.reduced){
+ if(!line.reduced&&line.role!=='unknown'){
   const heavy=line.role==='king'? .65:line.role==='guard'?1:.75;
   pose.heave=-Math.abs(stride)*.009-settle*.018;pose.lean=(weight*.035-settle*.025)*heavy;pose.roll=stride*.012;pose.sway=stride*.012;pose.capeDrag=-Math.sin(clamp((poseTime-.06)/.9)*Math.PI)*.06;
   pose.weaponPitch=-stride*.025;pose.weaponRoll=stride*.02;pose.leftArm=stride*.035;pose.rightArm=-stride*.025;
@@ -52,9 +52,8 @@ export function sampleBattle(t:number,line:Timeline,steps:number){
    const ready=ramp(held,0,.25),strike=ramp(held,.27,contact),follow=ramp(held,contact,.82),rest=ramp(held,.82,1);
    const release=1-rest;
    if(line.role==='guard'){pose.weaponPitch=(-.42*ready+1.57*strike+.32*follow)*release;pose.weaponRoll=(-.48*ready+1.01*strike+.18*follow)*release;pose.rightArm=-.035*ready*release;pose.leftArm=.08*ready*release;pose.lean=(.06*strike-.04*ready)*release;pose.leftLeg=.06*ready*release;pose.rightLeg=-.045*ready*release;}
-   else if(line.role==='king'){pose.weaponPitch=(-.32*ready+.84*strike)*release;pose.weaponRoll=.19*strike*release;pose.heave-=.008*strike*release;pose.leftArm=-.1*ready*release;pose.lean=(-.025*ready+.045*strike)*release;}
+   else if(line.role==='king'){pose.weaponHeight=(.14*ready-.34*strike)*release;pose.weaponPitch=(-.32*ready+.84*strike)*release;pose.weaponRoll=.19*strike*release;pose.heave-=.008*strike*release;pose.leftArm=-.1*ready*release;pose.lean=(-.025*ready+.045*strike)*release;}
    else if(line.role==='martyr'){pose.weaponPitch=(-.38*ready+.2*strike)*release;pose.sealScale=1+(.38*ready-.62*strike)*release;pose.sealLift=.06*ready*release;pose.leftArm=-.06*ready*release;pose.rightArm=-.06*ready*release;pose.lean=.07*strike*release;}
-   else{pose.lean=(.055*strike-.025*ready)*release;pose.sealScale=1+(.12*ready-.2*strike)*release;pose.leftArm=-.025*ready*release;pose.rightArm=-.025*ready*release;}
   }
   if(!line.attack&&!line.execution){
    const load=ramp(t,0,.16)*(1-ramp(t,.16,.35));
@@ -65,9 +64,9 @@ export function sampleBattle(t:number,line:Timeline,steps:number){
    pose.weaponPitch+=.09*load-.10*brake;
    pose.capeDrag+=.12*brake;
   }
-  if(line.charge){const lift=ramp(t,0,.46);pose.weaponPitch=-.55*lift;pose.weaponRoll=-.34*lift;pose.rightArm=-.04*lift;pose.lean=-.025*lift;}
+  if(line.charge){const lift=ramp(t,0,.46);pose.weaponPitch=-.55*lift;pose.weaponRoll=-.34*lift;pose.rightArm=-.04*lift;pose.lean=.19*lift;pose.heave=-.09*lift;pose.leftLeg=.33*lift;pose.rightLeg=-.23*lift;}
  }
- const lift=line.reduced||line.attack||line.execution?0:
+ const lift=line.reduced||line.role==='unknown'||line.attack||line.execution?0:
   .085*ramp(t,.08,.34)*(1-ramp(t,.54,line.plant));
  return{index:path.index,local,travel,lift,pose,held,phase:t<.18?'prepare':line.attack&&local>=contact&&local<contact+hold?'contact':local<.87?'drive':'settle'};
 }

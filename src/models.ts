@@ -244,7 +244,7 @@ export function disposeCharacters(){
 export function poseFigure(rig:CharacterRig,p:FigurePose,yaw=0){
  for(const part of Object.values(rig)){part.position.fromArray(part.userData.bindPosition);part.rotation.fromArray(part.userData.bindRotation);part.scale.setScalar(1);}
  rig.body.position.y+=p.heave;rig.body.position.x+=Math.sin(yaw)*p.sway;rig.body.position.z+=Math.cos(yaw)*p.sway;rig.body.rotation.set(p.lean,yaw,p.roll,'YXZ');
- rig.weapon.rotation.x+=p.weaponPitch;rig.weapon.rotation.z+=p.weaponRoll;rig.cape.rotation.x+=p.capeDrag;
+ rig.weapon.position.y+=p.weaponHeight;rig.weapon.rotation.x+=p.weaponPitch;rig.weapon.rotation.z+=p.weaponRoll;rig.cape.rotation.x+=p.capeDrag;
  rig.leftArm.rotation.x+=p.leftArm;rig.rightArm.rotation.x+=p.rightArm;rig.leftLeg.rotation.x+=p.leftLeg;rig.rightLeg.rotation.x+=p.rightLeg;
  rig.seal.scale.setScalar(p.sealScale);rig.seal.position.y+=p.sealLift;rig.crown.position.y+=p.crownLift;rig.crown.rotation.z+=p.crownRoll;
 }

@@ -32,7 +32,7 @@ test('plant marks the first grounded frame at the destination for every visible 
    assert.ok(sampleBattle(plant-.001,l,1).travel<1);
    assert.equal(sampleBattle(plant,l,1).travel,1);
    assert.equal(sampleBattle(plant,l,1).lift,0);
-   assert.equal(sampleBattle(.4,l,1).lift>0,!reduced);
+   assert.equal(sampleBattle(.4,l,1).lift>0,!reduced&&role!=='unknown');
   }
  }
 });

@@ -76,6 +76,8 @@ export class BoardScene {
   onBattleCue:((kind:string,options?:CueOptions)=>void)|null=null;
   onBattleCancel:((group:string)=>void)|null=null;onPublicCapture:((capture:Capture)=>void)|null=null;
   lastSkipped=false;private instance=++sceneSerial;private actionSerial=0;private ceremonySerial=0;private audioQueue:{kind:string;options:CueOptions;at:number}[]=[];private cameraImpulse:{at:number;direction:T.Vector3}|null=null;private cameraBase=new T.Vector3();
+  private executionShade=document.createElement('div');
+  private executionLamp=new T.PointLight(0xe7f5ff,0,4,2);
   debugActionProgress:number|null=null;
   cueLog:{id:string;kind:string;index?:number}[]=[];
   observer: ResizeObserver;
@@ -104,6 +106,11 @@ export class BoardScene {
     this.renderer.domElement.setAttribute('aria-label', '可交互的三维魔法棋盘，点击己方棋子，再点击亮起的合法格子');
     this.renderer.domElement.setAttribute('role', 'img');
     host.appendChild(this.renderer.domElement);
+    this.executionShade.className='execution-shade';
+    this.executionShade.setAttribute('aria-hidden','true');
+    document.body.appendChild(this.executionShade);
+    this.executionLamp.intensity=0;
+    this.root.add(this.executionLamp);
     const pmrem=new T.PMREMGenerator(this.renderer),room=new RoomEnvironment();
     this.environment=pmrem.fromScene(room,.04,.1,100,{size:128});this.scene.environment=this.environment.texture;this.scene.environmentIntensity=.8;
     room.dispose();pmrem.dispose();
@@ -280,6 +287,7 @@ export class BoardScene {
     const victims=steps.flatMap((step,index)=>{const a=step.victimId?this.actors.get(step.victimId):undefined;return a?[{id:step.victimId!,actor:a,index,at:a.group.position.clone(),disclosed:false}]:[];});
     const victimId=victims[0]?.id,to=steps.at(-1)!,line=battleTimeline(role,steps.length,execution,!!victimId,!!options.charge,reduced),from=actor.group.position.clone(),destination=cellToWorld(to.x,to.y,.18),dir=destination.clone().sub(from).setY(0);
     const goalFacing=dir.lengthSq()>.001?shortAngle(Math.atan2(dir.x,dir.z)-actor.model.rotation.y):actor.facing;
+    if(!execution&&!victimId&&dir.lengthSq()>.001){line.cues.push({kind:'slide',at:.19});line.cues.sort((a,b)=>a.at-b.at);}
     this.boardMarks.landAt(to.x,to.y,!!to.victimId);
     if(execution)this.fx.startAction(from,steps,role);else if(victimId)this.fx.startStrike(role,from,steps);else if(role==='martyr'&&!reduced)this.fx.startMartyrTrail(from,steps);
     this.lastAttack=victimId||execution?{role,victimId,dissolved:false,execution,path:steps.map(p=>({...p}))}:null;
@@ -287,7 +295,8 @@ export class BoardScene {
   }
   cancelMove(completed=false){
     const tr=this.transition;this.transition=null;if(!tr)return;
-    this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
+    this.executionShade.style.opacity='0';this.executionLamp.intensity=0;
+    this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;pose.lean=.19;pose.heave=-.09;pose.leftLeg=.33;pose.rightLeg=-.23;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
     for(const v of tr.victims)this.removeActor(v.id,v.actor);
     if(!completed||tr.silent){this.audioQueue=this.audioQueue.filter(c=>c.options.group!==tr.groupKey);this.onBattleCancel?.(tr.groupKey);}
     if(completed)this.fx.clearAction();else this.fx.clearTransient();
@@ -301,6 +310,14 @@ export class BoardScene {
     const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,step=tr.steps[index],from=index?cellToWorld(tr.steps[index-1].x,tr.steps[index-1].y,.18):tr.from,to=cellToWorld(step.x,step.y,.18),dir=to.clone().sub(from).setY(0).normalize(),actor=tr.actor;
     actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=sample.lift+tr.startLift*(1-smooth(progress/.28));
     actor.model.rotation.z=0;
+    if(tr.execution&&!tr.line.reduced&&!tr.silent){
+      const focus=smooth(progress/.14)*(1-smooth((progress-.79)/.20));
+      const point=this.projectActor(tr.id,.72);
+      if(point){this.executionShade.style.setProperty('--focus-x',point.x+'px');this.executionShade.style.setProperty('--focus-y',point.y+'px');}
+      this.executionShade.style.opacity=String(.84*focus);
+      this.executionLamp.intensity=7*focus;
+      this.executionLamp.position.copy(actor.group.position).add(new T.Vector3(.23,2.1,.28));
+    }
     this.boardMarks.setLandingContact(progress,tr.line.plant,tr.line.reduced);
     if(actor.rig){const turn=tr.line.reduced?1:smooth(clamp(progress/.26));poseFigure(actor.rig,sample.pose,tr.fromFacing+shortAngle(tr.goalFacing-tr.fromFacing)*turn);}
     actor.group.updateMatrixWorld(true);const tip=actor.rig?actor.rig.weapon.localToWorld(new T.Vector3().fromArray(actor.rig.weapon.userData.contact??[0,.3,0])):actor.group.position.clone();
@@ -317,6 +334,7 @@ export class BoardScene {
         if(beat&&victim&&!victim.disclosed){
           victim.disclosed=true;
           if(!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
+          if(fresh&&!tr.execution&&!tr.line.reduced)this.fx.ash(victim.at,dir,at);
           if(!tr.silent)this.onPublicCapture?.(beat.capture);
         }
         continue;
@@ -332,7 +350,8 @@ export class BoardScene {
         if(tr.pendingState)this.syncEffects(tr.pendingState,rites,now);
         if(!tr.silent)this.onBoardContact?.(tr.id,hit,rites,reveals);
         material=victim.actor.role;
-        if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,material);if(!tr.line.reduced&&this.state.cinematic&&(tr.execution||tr.publicBeats.decisive===i))this.cameraImpulse={at,direction:dir.clone()};}
+        if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,tr.execution);
+        if(tr.role==='king'&&!tr.line.reduced)this.fx.crownStrike(actor.group.position,at);if(!tr.line.reduced&&this.state.cinematic&&(tr.execution||tr.publicBeats.decisive===i))this.cameraImpulse={at,direction:dir.clone()};}
       }
       if(cue.kind==='recover'&&tr.pendingState&&!tr.ceremonyCommitted){tr.ceremonyCommitted=true;this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);}
       if(fresh){const kind=tr.execution&&tr.role!=='unknown'?`execution-${cue.kind}`:`battle-${tr.role}-${cue.kind}`;this.audioQueue.push({kind,options:{key:`${tr.groupKey}/${cueIndex}`,group:tr.groupKey,reduced:tr.line.reduced,material,decisive:cue.kind==='impact'&&tr.publicBeats.decisive===cue.index},at});}
@@ -343,13 +362,14 @@ export class BoardScene {
       const age=smooth(clamp((progress-discloseAt)/(end-discloseAt)));
       if(age>=.999){this.removeActor(v.id,v.actor);continue;}
       const sinceHit=(progress-hit)*tr.duration;
-      const kick=tr.line.reduced?0:smooth(sinceHit/45)*(1-smooth((sinceHit-45)/180));
+      const kick=tr.line.reduced||v.actor.role==='unknown'?0:smooth(sinceHit/45)*(1-smooth((sinceHit-45)/180));
       v.actor.group.position.copy(v.at).addScaledVector(dir,.12*kick);
-      v.actor.group.rotation.set(dir.z*.13*kick,0,-dir.x*.13*kick);
-      if(v.actor.rig)poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
+      const fall=tr.execution||tr.line.reduced||v.actor.role==='unknown'?0:1.22*smooth((age-.03)/.69);
+      v.actor.group.rotation.set(dir.z*(.13*kick+fall),0,-dir.x*(.13*kick+fall));
+      if(v.actor.rig&&!tr.execution&&v.actor.role!=='unknown')poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
       if(progress<discloseAt)continue;
       (v.actor.rune.material as T.MeshBasicMaterial).opacity=.25*(1-age);
-      v.actor.model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}const start=m.userData.scope==='base'?.68:m.userData.scope==='crown'?.35:.18;m.opacity=1-smooth(clamp((age-start)/(.98-start)));}});
+      v.actor.model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}const start=tr.execution?0:m.userData.scope==='base'?.58:m.userData.scope==='crown'?.35:.18;m.opacity=1-smooth(clamp((age-start)/(.98-start)));}});
     }
     if(progress>=1){if(tr.pendingState&&!tr.ceremonyCommitted)this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);if(this.lastAttack)this.lastAttack.dissolved=true;this.cancelMove(true);}
   }
@@ -441,9 +461,9 @@ export class BoardScene {
       const piece=this.state.pieces.find(p=>p.id===id);
       if(actor.revealStarted&&now-actor.revealStarted>700)actor.revealStarted=undefined;
       if(this.transition?.id===id||this.transition?.victims.some(v=>v.id===id))continue;
-      actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&this.state.selected===id ? .032 : 0;
+      actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&actor.role!=='unknown'&&this.state.selected===id ? .032 : 0;
       actor.model.position.y=T.MathUtils.damp(actor.model.position.y,selectedLift,22,dt);
-      if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;}poseFigure(actor.rig,pose,actor.facing);}
+      if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced&&actor.role!=='unknown'){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;pose.lean=.19;pose.heave=-.09;pose.leftLeg=.33;pose.rightLeg=-.23;}poseFigure(actor.rig,pose,actor.facing);}
       actor.rune.rotation.z += this.state.reduced ? 0 : dt * .12;
     }
     const actionTime=import.meta.env.MODE==='test'&&this.debugActionProgress!==null&&this.transition?this.transition.start+this.transition.duration*this.debugActionProgress:now;
@@ -483,6 +503,6 @@ export class BoardScene {
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown); this.renderer.domElement.removeEventListener('pointerup', this.pointerUp); this.renderer.domElement.removeEventListener('pointermove', this.pointerMove); this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.removeEventListener('lostpointercapture', this.pointerCancel);
-    this.batches.clear();this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();
+    this.batches.clear();this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();this.executionShade.remove();
   }
 }
