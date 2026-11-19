@@ -20,8 +20,8 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
  }
  const parts=kind.split('-'),role:VisibleRole=kind.startsWith('execution-')?'guard':(['king','guard','martyr','unknown'].includes(parts[1])?parts[1]:'unknown') as VisibleRole;
  const stage=kind.startsWith('execution-')?parts[1]:parts.at(-1);
- if(kind==='execution-release')return[grain(3150,.13,.09),tone(990,.32,.075,1820,'triangle'),tone(1975,.19,.028,2200)];
- if(kind==='execution-dash')return[grain(4100,.16,.13),tone(1420,.13,.06,690),tone(770,.12,.031,310)];
+ if(kind==='execution-release')return[grain(3150,.08,.055),tone(710,.36,.064,1870,'triangle'),tone(1370,.24,.035,2520,'sine',.11)];
+ if(kind==='execution-dash')return[grain(4750,.09,.16),tone(2100,.12,.065,590),tone(116,.11,.08,54)];
  if(stage==='windup'||stage==='release'||stage==='dash'){
   if(role==='guard')return[grain(stage==='dash'?1800:1300,.11,.09),tone(740,.16,.04,980)];
   if(role==='king')return[tone(98,.24,.1,130.81),tone(392,.18,.035)];

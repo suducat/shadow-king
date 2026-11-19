@@ -5,7 +5,7 @@ import {RigidBatches} from './rigid-batches';
 import {renderResolution} from './render-resolution';
 import {surface,disposeSurfaces,setSurfaceSampling} from './surfaces';
 import {BattleEffects} from './battle-effects';
-import {battleTimeline,consumeCues,sampleBattle,retirementPose,disclosureDelay,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
+import {battleTimeline,consumeCues,sampleBattle,drawStance,drawStart,drawSpan,retirementPose,disclosureDelay,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
 import type {CueOptions} from './audio';
 import type { Side, VisiblePiece, VisibleRole,Capture } from './game';
 import {type GameMode,type Rites,type ActionStep} from './ritual';
@@ -296,7 +296,7 @@ export class BoardScene {
   cancelMove(completed=false){
     const tr=this.transition;this.transition=null;if(!tr)return;
     this.executionShade.style.opacity='0';this.executionLamp.intensity=0;
-    this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;pose.lean=.19;pose.heave=-.09;pose.leftLeg=.33;pose.rightLeg=-.23;}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
+    this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){drawStance(pose);}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
     for(const v of tr.victims)this.removeActor(v.id,v.actor);
     if(!completed||tr.silent){this.audioQueue=this.audioQueue.filter(c=>c.options.group!==tr.groupKey);this.onBattleCancel?.(tr.groupKey);}
     if(completed)this.fx.clearAction();else this.fx.clearTransient();
@@ -312,8 +312,6 @@ export class BoardScene {
     actor.model.rotation.z=0;
     if(tr.execution&&!tr.line.reduced&&!tr.silent){
       const focus=smooth(progress/.14)*(1-smooth((progress-.79)/.20));
-      const point=this.projectActor(tr.id,.72);
-      if(point){this.executionShade.style.setProperty('--focus-x',point.x+'px');this.executionShade.style.setProperty('--focus-y',point.y+'px');}
       this.executionShade.style.opacity=String(.84*focus);
       this.executionLamp.intensity=7*focus;
       this.executionLamp.position.copy(actor.group.position).add(new T.Vector3(.23,2.1,.28));
@@ -334,6 +332,10 @@ export class BoardScene {
         if(beat&&victim&&!victim.disclosed){
           victim.disclosed=true;
           if(!victim.actor.disposed&&!tr.silent&&progress<.98)this.revealActor(victim.id,beat.capture.role);
+          if(fresh&&tr.execution&&!tr.line.reduced&&!victim.actor.disposed){
+            this.fx.fracture(victim.actor.model,dir,at);
+            victim.actor.model.visible=false;
+          }
           if(fresh&&!tr.execution&&!tr.line.reduced)this.fx.ash(victim.at,dir,at);
           if(!tr.silent)this.onPublicCapture?.(beat.capture);
         }
@@ -463,12 +465,23 @@ export class BoardScene {
       if(this.transition?.id===id||this.transition?.victims.some(v=>v.id===id))continue;
       actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&actor.role!=='unknown'&&this.state.selected===id ? .032 : 0;
       actor.model.position.y=T.MathUtils.damp(actor.model.position.y,selectedLift,22,dt);
-      if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced&&actor.role!=='unknown'){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){pose.weaponPitch=-.55;pose.weaponRoll=-.34;pose.rightArm=-.04;pose.lean=.19;pose.heave=-.09;pose.leftLeg=.33;pose.rightLeg=-.23;}poseFigure(actor.rig,pose,actor.facing);}
+      if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced&&actor.role!=='unknown'){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){drawStance(pose);}poseFigure(actor.rig,pose,actor.facing);}
       actor.rune.rotation.z += this.state.reduced ? 0 : dt * .12;
     }
     const actionTime=import.meta.env.MODE==='test'&&this.debugActionProgress!==null&&this.transition?this.transition.start+this.transition.duration*this.debugActionProgress:now;
     this.stepMove(actionTime);
-    if(this.cameraImpulse&&this.state.cinematic&&!this.state.reduced){const t=(actionTime-this.cameraImpulse.at)/180;if(t>=1)this.cameraImpulse=null;else{this.camera.position.addScaledVector(this.cameraImpulse.direction,-.018*Math.sin(t*Math.PI)*(1-t));this.camera.lookAt(0,-.05,0);}}
+    const cut=this.transition;
+    if(cut?.execution&&this.state.cinematic&&!cut.line.reduced&&!cut.silent){
+      const t=cut.lastProgress,frame=smooth(t/.32)*(1-smooth((t-drawStart-drawSpan)/.34));
+      const target=cut.from.clone().lerp(cut.to,.5);
+      this.camera.position.lerp(target,.32*frame);
+      this.camera.lookAt(target.x*.48*frame,-.05+.46*frame,target.z*.48*frame);
+    }
+    if(cut?.execution&&!cut.line.reduced&&!cut.silent){
+      const point=this.projectActor(cut.id,.72);
+      if(point){this.executionShade.style.setProperty('--focus-x',point.x+'px');this.executionShade.style.setProperty('--focus-y',point.y+'px');}
+    }
+    if(!cut?.execution&&this.cameraImpulse&&this.state.cinematic&&!this.state.reduced){const t=(actionTime-this.cameraImpulse.at)/180;if(t>=1)this.cameraImpulse=null;else{this.camera.position.addScaledVector(this.cameraImpulse.direction,-.018*Math.sin(t*Math.PI)*(1-t));this.camera.lookAt(0,-.05,0);}}
     this.fx.tick(actionTime,this.state.reduced,this.actors);
     if (this.burst) {
       const age = (now - this.burst.start) / 1000;

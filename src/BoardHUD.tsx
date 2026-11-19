@@ -22,7 +22,11 @@ export function BoardHUD({scene,game,pieces,selected,legal,chargeIntent,canAct,c
   let frame=0;const tick=()=>{
    const board=scene.current;
    if(board){
-    for(const p of badges){const el=labels.current.get(p.id);if(!el)continue;const at=board.projectActor(p.id,1.55);if(at){el.style.left=`${Math.min(innerWidth-75,Math.max(75,at.x))}px`;el.style.top=`${at.y}px`;}}
+    for(const p of badges){const el=labels.current.get(p.id);if(!el)continue;
+     const drawing=board.transition?.execution&&board.transition.id===p.id;
+     el.style.visibility=drawing?'hidden':'';
+     if(drawing)continue;
+     const at=board.projectActor(p.id,1.55);if(at){el.style.left=`${Math.min(innerWidth-75,Math.max(75,at.x))}px`;el.style.top=`${at.y}px`;}}
     if(panel.current&&guard){
      const at=board.projectActor(guard.id,1),el=panel.current;if(at){const w=el.offsetWidth,h=el.offsetHeight,minY=94,maxY=Math.max(minY,innerHeight-h-12);
       const candidates=[{x:at.x-w/2,y:at.y-h-45},{x:at.x+48,y:at.y-h/2},{x:at.x-w-48,y:at.y-h/2},{x:at.x-w/2,y:at.y+55}];
