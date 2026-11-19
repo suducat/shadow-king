@@ -10,8 +10,8 @@ const outcomeLines:Record<Difficulty,[string,string]>={
  omniscient:['全知者合上永夜之眼。','帷幕落下，全知者的目光归于沉寂。'],
 };
 
-export function MatchVignette({difficulty,outcome,reduced,onEnd}:{
- difficulty?:Difficulty;outcome?:'win'|'loss';reduced:boolean;onEnd?:()=>void;
+export function MatchVignette({difficulty,outcome,reduced,onEnd,online=false}:{
+ difficulty?:Difficulty;outcome?:'win'|'loss';reduced:boolean;onEnd?:()=>void;online?:boolean;
 }){
  useEffect(()=>{
   if(!onEnd)return;
@@ -32,7 +32,7 @@ export function MatchVignette({difficulty,outcome,reduced,onEnd}:{
    </svg>}
   </div>
   <div className="match-vignette-copy" role="status">
-   <strong>{outcome&&difficulty?`${DIFFICULTIES[difficulty].name} · ${outcome==='win'?'胜利':'败北'}`:'永夜棋局 · 开局'}</strong>
+   <strong>{outcome&&difficulty?`${DIFFICULTIES[difficulty].name} · ${outcome==='win'?'胜利':'败北'}`:online?'棋局启幕':'永夜棋局 · 开局'}</strong>
    <p>{outcome&&difficulty?outcomeLines[difficulty][outcome==='win'?0:1]:'帷幕落下，红方先行。'}</p>
   </div>
  </div>;

@@ -6,4 +6,5 @@ import './combat.css';
 import './render.css';
 import './combat-polish.css';
 import './match-polish.css';
+import './court-summons.css';
 createRoot(document.getElementById('root')!).render(<App/>);

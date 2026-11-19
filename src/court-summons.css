@@ -1,0 +1,15 @@
+.phase-online .menu-scene { display: none; }
+.phase-online .menu-content { width: min(680px,100%); margin: auto; padding: 36px 24px 50px; }
+.court-summons { width: 100%; }
+.court-summons .mode-card { min-height: 100px; }
+.court-rule { color: #d1b781; margin: 0 0 16px; font-size: .86rem; }
+.court-invitation,.court-join,.court-ready { display: grid; gap: 14px; max-width: 440px; margin: 22px 0; }
+.court-invitation { justify-items: center; border: 1px solid #aa946666; background: #131e28; padding: 24px 12px; }
+.court-code,.court-join input { font: inherit; font-size: clamp(28px,7vw,48px); font-variant-numeric: tabular-nums; letter-spacing: .2em; color: #f2d9a4; }
+.court-code { user-select: all; }
+.court-join input { width: 100%; min-width: 0; padding: .2em .4em; background: #0b111a; border: 1px solid #aa9466; }
+.court-join input:focus-visible { outline: 2px solid #f2d9a4; outline-offset: 3px; }
+.court-ready > div { display: grid; grid-template-columns: 25px 1fr auto; align-items: center; gap: 10px; padding: 14px; border: 1px solid var(--line); background: #111b24; }
+.court-message,.court-wait { margin: 5px 0; color: #d1b781; }
+.court-error { color: #e6a89f; }
+.court-summons button { min-height: 44px; }
