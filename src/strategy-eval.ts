@@ -23,12 +23,12 @@ export function evaluateStrategy(g:Game,side:Side,style=0):number{
  const court=(s:Side)=>{
   const own=g.pieces.filter(p=>p.side===s),foe=g.pieces.filter(p=>p.side!==s),king=own.find(p=>p.role==='king'),guards=own.filter(p=>p.role==='guard').length,martyrs=own.filter(p=>p.role==='martyr').length;
   if(!king)return -100000;const enemy=other(s),threat=(p:{x:number;y:number})=>maps[enemy].get(`${p.x}/${p.y}`)??0,ownRite=g.ritual?.[s],enemyRite=g.ritual?.[enemy];
-  const enemyMartyrs=foe.filter(p=>p.role==='martyr').length,enemyKing=foe.find(p=>p.role==='king');
+  const enemyMartyrs=foe.filter(p=>p.role==='martyr').length,enemyKing=foe.find(p=>p.role==='king'),enemyGuards=foe.filter(p=>p.role==='guard');
   let value=guards*260+(guards===1?200:0),control=0;
   for(const cell of cells){const key=`${cell.x}/${cell.y}`,ours=maps[s].get(key)??0,theirs=maps[enemy].get(key)??0,occupied=own.some(p=>p.x===cell.x&&p.y===cell.y);
    const relevant=enemyKing?1+Math.max(0,3-distance(enemyKing,cell))*.35:1;control+=(Math.min(ours,2)*1.2-Math.min(theirs,2)*.5+(occupied?.7:0))*relevant;
   }
-  const urgency=!g.mode?0:enemyRite?.phase==='occupied'?65:enemyRite?.phase==='open'?35:enemyMartyrs<=1?17:enemyMartyrs===2?5:1;
+  const urgency=g.mode!=='ritual'?12:enemyRite?.phase==='occupied'?65:enemyRite?.phase==='open'?50:enemyMartyrs<=1?38:enemyMartyrs===2?12:10;
   value+=control*urgency*(style===2?1.1:1);
   const kDanger=threat(king);value-=kDanger*(g.turn===s?900:19000);
   value+=(6-altarDistance(king))*(!g.mode?5:ownRite?.phase!=='dormant'?55:6)+own.filter(p=>p!==king&&distance(p,king)===1).length*7;
@@ -40,6 +40,25 @@ export function evaluateStrategy(g:Game,side:Side,style=0):number{
    }
   }else value+=(3-martyrs)*190;
   for(const p of own){const d=threat(p),center=6-Math.abs(p.x-3)-Math.abs(p.y-3),near=Math.min(8,...foe.map(q=>distance(p,q)));
+   if(p.role!=='king'){
+    // Reward a screen that can contest several squares and be reinforced.
+    // A lone guard deep behind enemy lines receives no formation bonus.
+    const advance=s==='red'?6-p.y:p.y;
+    const partner=own.some(q=>q.role!=='king'&&q.role!==p.role&&distance(p,q)<=2);
+    const front=Math.min(3,advance)*(1-Math.abs(p.x-3)*.14);
+    value+=front*(p.role==='martyr'?27:partner?23:9)+(partner&&advance>=2?18:0);
+    // A martyr parked in the middle is easy to ignore. Beyond the
+    // middle, reward closing on the crown or the last guard, especially
+    // when the martyr threatens both and taking it advances our sacrifice.
+    if(enemyKing){
+     const crownDistance=distance(p,enemyKing);
+     const guardDistance=enemyGuards.length===1?distance(p,enemyGuards[0]):12;
+     const targetDistance=Math.min(crownDistance,guardDistance);
+     const pressure=Math.max(0,6-targetDistance);
+     value+=pressure*(p.role==='martyr'?34:partner?26:12);
+     if(crownDistance<=2&&guardDistance<=2)value+=55;
+    }
+   }
    if(p.role==='guard'){value+=center*(style===1?8:7)-d*(guards===1?(g.turn===s?750:18000):160)+(p.executionUsed?0:35)-(p.revealed?(style===3?26:18):0)+chargeMeaning(g,p);}
    if(p.role==='martyr'){
     // Martyrs retain board-control and shielding value; exposure is useful
@@ -59,7 +78,7 @@ export function actionOrder(g:Game,a:GameAction):number{
  if(a.kind==='charge'){const hypothetical={...p,x:a.x,y:a.y,charging:{readyPly:g.ply+2}},state={...g,pieces:g.pieces.map(q=>q.id===p.id?hypothetical:q)};score+=chargeMeaning(state,hypothetical,true)-35;}
  if(a.kind==='execute')score+=executionPath(g,p.id).filter(t=>t.victimId).length*130-45;
  score+=(6-Math.abs(a.x-3)-Math.abs(a.y-3))*4;
- if(p.role==='king'&&g.ritual?.[p.side].phase!=='dormant')score+=(altarDistance(p)-altarDistance(a))*130;
+ if(p.role==='king'&&g.ritual&&g.ritual[p.side].phase!=='dormant')score+=(altarDistance(p)-altarDistance(a))*130;
  return score;
 }
 export function habitCost(o:Observation,a:GameAction):number{

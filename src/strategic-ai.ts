@@ -1,12 +1,12 @@
 import {allActions,act,other,type Game} from './game';
-import {resolveRitual} from './ritual';
+import {resolveRitual,executionPath} from './ritual';
 import {inferIdentities,sampleWorlds,worldGame} from './belief';
 import {evaluateStrategy,actionOrder,habitCost,attacks} from './strategy-eval';
 import type {Observation,StandardDifficulty,SearchOptions,Decision,Action} from './ai';
 import {forcedRiteLoss} from './rite-proof';
 const rngFor=(seed:number)=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 export function decideStrategic(o:Observation,difficulty:StandardDifficulty,options:SearchOptions={}):Decision{
- const start=performance.now(),rng=rngFor(options.seed??1),belief=inferIdentities(o,difficulty==='hard'||difficulty==='master');
+ const start=performance.now(),rng=rngFor(options.seed??1),belief=inferIdentities(o);
  const maxMillis=options.maxMillis??({easy:20,normal:100,hard:220,master:650}[difficulty]),limit=start+maxMillis,budget=options.nodeBudget??({easy:120,normal:600,hard:1800,master:5000}[difficulty]);let nodes=0,depth=1,rounds=0,inferenceStates=0;
  const first=o.history[0];const style=difficulty==='master'?(first?(first.from.x*7+first.to.x+first.to.y)%4:(options.seed??1)%4):0;
  const worlds=sampleWorlds(belief,{easy:1,normal:3,hard:5,master:8}[difficulty],rng),games=worlds.map(w=>({g:worldGame(o,belief,w),weight:w.weight,key:w.roles.join('/')}));
@@ -20,9 +20,23 @@ export function decideStrategic(o:Observation,difficulty:StandardDifficulty,opti
  // guess while overlooking a comparably likely irreversible defeat.
  const winUtility=25000,lossUtility=-100000;
  const value=(g:Game)=>g.result?(g.result.winner===null?0:g.result.winner===o.side?winUtility:lossUtility):evaluateStrategy(g,o.side,style);
- type Root={a:Action;value:number;prior:number;terminal?:{win:number;loss:number;ongoing:number;staticValue:number;settled:Set<string>}};
- const rank:Root[]=legal.map(a=>{return{a,value:-Infinity,prior:actionOrder(games[0].g,a)-habitCost(o,a)};}).sort((a,b)=>b.prior-a.prior);
- const fallback=()=>{const scored=rank.map(r=>{if(Number.isFinite(r.value))return{a:r.a,value:r.value};const isCapture=r.a.kind==='execute'||games[0].g.pieces.some(p=>p.side!==o.side&&p.x===r.a.x&&p.y===r.a.y);return{a:r.a,value:isCapture?-Infinity:value(advance(games[0].g,r.a))-habitCost(o,r.a)};}).filter(r=>Number.isFinite(r.value));if(scored.length)return scored.reduce((a,b)=>a.value>b.value?a:b).a;
+ type Root={a:Action;value:number;prior:number;cost:number;winCredit:number;terminal?:{win:number;loss:number;ongoing:number;staticValue:number;settled:Set<string>}};
+ const rank:Root[]=legal.map(a=>{
+  const hits=a.kind==='execute'?executionPath(games[0].g,a.id).filter(t=>t.victimId):[];
+  const target=a.kind==='execute'
+   ? (hits.length===1?o.pieces.find(p=>p.id===hits[0].victimId):undefined)
+   : o.pieces.find(p=>p.side!==o.side&&p.x===a.x&&p.y===a.y);
+  // A small royal probability on a conspicuous offer used to dominate every
+  // positional alternative. Discount the speculative upside, never a loss
+  // or a proved win. Executions can have a second, independent target.
+  const martyr=target?.role==='unknown'?belief.marginals[target.id].martyr:0;
+  const confidence=difficulty==='hard'||difficulty==='master'?Math.min(1,Math.max(0,(martyr-.5)/.28)):0;
+  const winCredit=winUtility*(1-.97*confidence);
+  // Handing over a sacrifice is a real positional concession even when
+  // it merely opens a future route and the sampled line is nonterminal.
+  const cost=habitCost(o,a)+confidence*460;
+  return{a,value:-Infinity,winCredit,cost,prior:actionOrder(games[0].g,a)-cost};}).sort((a,b)=>b.prior-a.prior);
+ const fallback=()=>{const scored=rank.map(r=>{if(Number.isFinite(r.value))return{a:r.a,value:r.value};const isCapture=r.a.kind==='execute'||games[0].g.pieces.some(p=>p.side!==o.side&&p.x===r.a.x&&p.y===r.a.y);return{a:r.a,value:isCapture?-Infinity:value(advance(games[0].g,r.a))-r.cost};}).filter(r=>Number.isFinite(r.value));if(scored.length)return scored.reduce((a,b)=>a.value>b.value?a:b).a;
   // Use public physical danger to avoid an unsafe prior-order capture on cutoff.
   return [...rank].sort((a,b)=>{const score=(r:Root)=>{const n=advance(games[0].g,r.a),king=n.pieces.find(p=>p.side===o.side&&p.role==='king');return (king&&!attacks(n,other(o.side)).has(`${king.x}/${king.y}`)?10000:0)+(r.a.kind?0:100)-r.prior*.01;};return score(b)-score(a);})[0].a;};
  const advance=(g:Game,a:Action)=>g.mode==='ritual'?resolveRitual(g,a,true):act(g,a);
@@ -41,13 +55,13 @@ export function decideStrategic(o:Observation,difficulty:StandardDifficulty,opti
    if(next.result){t.settled.add(sample.key);if(next.result.winner===o.side)t.win+=sample.weight;else if(next.result.winner===other(o.side))t.loss+=sample.weight;}
    else{const proof=forcedRiteLoss(next,o.side,()=>performance.now()>=limit);inferenceStates+=proof.checks;if(!proof.complete)return done(fallback());if(proof.loss){t.settled.add(sample.key);t.loss+=sample.weight;}else{t.ongoing+=sample.weight;t.staticValue+=value(next)*sample.weight;}}
   }
-  root.terminal=t;root.value=winUtility*t.win+lossUtility*t.loss+t.staticValue-habitCost(o,root.a);if(t.win>1-1e-9)return done(root.a);
+  root.terminal=t;root.value=root.winCredit*t.win+lossUtility*t.loss+t.staticValue-root.cost;if(t.win>1-1e-9)return done(root.a);
  }
- const combined=(root:Root,total:number,weight:number)=>root.terminal?winUtility*root.terminal.win+lossUtility*root.terminal.loss+(weight?total/weight*root.terminal.ongoing:root.terminal.staticValue):total/(weight||1);
+ const combined=(root:Root,total:number,weight:number)=>root.terminal?root.winCredit*root.terminal.win+lossUtility*root.terminal.loss+(weight?total/weight*root.terminal.ongoing:root.terminal.staticValue):total/(weight||1);
  // Complete common-sample first pass; exact root terminal mass is held fixed
  // at every depth, while search estimates only conditional ongoing outcomes.
  for(const root of rank){let total=0,weight=0;for(const sample of games){if(expired())return done(fallback());const next=step(sample.g,root.a);if(root.terminal?.settled.has(sample.key))continue;total+=value(next)*sample.weight;weight+=sample.weight;}
-  root.value=combined(root,total,weight)-habitCost(o,root.a)+(root.a.kind==='charge'?-35:0);
+  root.value=combined(root,total,weight)-root.cost+(root.a.kind==='charge'?-35:0);
  }
  rank.sort((a,b)=>b.value-a.value);let best=rank[0].a;
  if(difficulty==='easy'){const near=rank.filter(r=>r.value>=rank[0].value-110);return done(near[Math.floor(rng()*Math.min(5,near.length))].a);}
@@ -75,7 +89,7 @@ export function decideStrategic(o:Observation,difficulty:StandardDifficulty,opti
    if(expired())break;
   }
   if(expired()||completed!==games.length)break;rounds+=completed;depth=targetDepth;
-  const scores=active.map(r=>({a:r.a,value:combined(r,totals.get(r)!,weights.get(r)!)-habitCost(o,r.a)+(r.a.kind==='charge'?-35:0)})).sort((a,b)=>b.value-a.value);
+  const scores=active.map(r=>({a:r.a,value:combined(r,totals.get(r)!,weights.get(r)!)-r.cost+(r.a.kind==='charge'?-35:0)})).sort((a,b)=>b.value-a.value);
   candidates=active.map(r=>({...r,value:scores.find(s=>s.a===r.a)!.value})).sort((a,b)=>b.value-a.value);
   const close=scores.filter(s=>s.value>=scores[0].value-(difficulty==='master'?3:0));best=close[Math.floor(rng()*close.length)].a;
   if(expired())break;

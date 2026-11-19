@@ -33,7 +33,11 @@ export function decideOmniscient(o:Observation,options:SearchOptions={}):Decisio
  const step=(s:Game,a:Action)=>{nodes++;return act(s,a);};
  const evaluate=(s:Game,ply=0)=>{if(s.result)return s.result.winner===null?0:s.result.winner===side?1000000-ply*100:-1800000+ply*100;let v=evaluateStrategy(s,side);
   const mobility=(who:Side)=>{const k=s.pieces.find(p=>p.side===who&&p.role==='king');if(!k)return 0;const enemies=attacks(s,other(who));return [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>{const x=k.x+dx,y=k.y+dy;return x>=0&&x<7&&y>=0&&y<7&&!s.pieces.some(p=>p.side===who&&p.x===x&&p.y===y)&&!enemies.has(`${x}/${y}`);}).length;};
-  v+=(mobility(side)-mobility(foe))*150;
+  // An extra royal exit matters most when the king is boxed in.
+  // Flat rewards for every exit previously pulled the king out before
+  // the screening pieces and made harmless king shuffles attractive.
+  const escapeValue=[-190,0,85,110,120];
+  v+=escapeValue[mobility(side)]-escapeValue[mobility(foe)];
   // A hidden crown is still a crown. Do not use it as the nearest hunter:
   // spending its escape squares to chase a target caused avoidable encirclement.
   const king=s.pieces.find(p=>p.side===side&&p.role==='king');
@@ -77,7 +81,23 @@ export function decideOmniscient(o:Observation,options:SearchOptions={}):Decisio
   }else{
    const publicView=observe(s,foe,h),policyKey=JSON.stringify(publicView);let policy=policies.get(policyKey);
    if(!policy){policy=opponentPolicy(publicView,expired,()=>policyNodes++);if(policies.size<3500)policies.set(policyKey,policy);}
-   v=0;for(let i=0;i<policy.length;i++){if(expired())break;const p=policy[i],n=step(s,p.action);const score=i<5||p.forcing?tree(n,append(s,p.action,n,h),depth-1,ply+1):evaluate(n,ply+1);v+=p.probability*score;}
+   let worstCredible=Infinity,worstReply=Infinity;
+   v=0;
+   for(let i=0;i<policy.length;i++){
+    if(expired())break;
+    const p=policy[i],n=step(s,p.action);
+    const score=i<5||p.forcing?tree(n,append(s,p.action,n,h),depth-1,ply+1):evaluate(n,ply+1);
+    // Do not build a plan around the responder voluntarily giving us a
+    // terminal result when other replies exist. Forced immediate wins
+    // have already been checked across every legal reply at the root.
+    worstReply=Math.min(worstReply,score);
+    v+=p.probability*Math.min(score,12000);
+    // Hedge against a skilled responder choosing a strong public candidate.
+    // Eligibility comes from the responder’s masked policy, not our knowledge.
+    if(p.probability>=policy[0].probability*.4)worstCredible=Math.min(worstCredible,score);
+   }
+   if(worstReply>12000&&Number.isFinite(worstReply))v=worstReply;
+   else if(Number.isFinite(worstCredible))v=.65*v+.35*Math.min(12000,worstCredible);
   }
   if(!expired()&&tt.size<25000)tt.set(key,{depth,value:v});return v;
  };

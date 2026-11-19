@@ -11,15 +11,29 @@ export function inferIdentities(o:Observation,behavior=true):Belief{
  for(const c of o.captures)if(c.side===enemy)counts[c.role]--;
  const remaining={...counts};for(const p of o.pieces)if(p.side===enemy&&p.role!=='unknown')counts[p.role]--;
  if(roles.some(r=>counts[r]<0)||roles.reduce((n,r)=>n+counts[r],0)!==unknown.length)throw new Error('Invalid public inventory');
+ // Rewind surviving defenders through public moves. A defender arriving later
+ // must not turn an earlier quiet advance into evidence of a deliberate offer.
+ const defenders=new Map(o.pieces.filter(p=>p.side===o.side).map(p=>[p.id,{x:p.x,y:p.y}]));
+ const offers=new Map<string,number>();
+ for(let i=o.history.length-1;i>=0;i--){
+  const h=o.history[i];
+  if(h.side===o.side){if(defenders.has(h.id))defenders.set(h.id,h.from);continue;}
+  if(!h.captured&&Array.from(defenders.values()).some(q=>dist(h.to,q)===1))
+   offers.set(h.id,(offers.get(h.id)??0)+1);
+ }
  const evidence=unknown.map(p=>{
-  const moves=o.history.filter(h=>h.id===p.id),home=enemy==='red'?6:0,progress=Math.abs(p.y-home),near=o.pieces.filter(q=>q.side!==enemy);
-  const advances=moves.filter(h=>Math.abs(h.to.y-home)>Math.abs(h.from.y-home)).length,retreats=moves.filter(h=>Math.abs(h.to.y-home)<Math.abs(h.from.y-home)).length;
-  const exposure=moves.filter(h=>near.some(q=>dist(h.to,q)<=1)).length,centerVisits=moves.filter(h=>h.to.x>=2&&h.to.x<=4&&h.to.y>=2&&h.to.y<=4).length;
-  const protectedMoves=o.history.filter(h=>h.side===enemy&&h.id!==p.id&&dist(h.to,p)===1).length;
-  // Weak, bounded behavioral evidence, never a role label. Current-survivor
-  // distances are a proxy, not a reconstructed omniscient movement history.
-  const bound=(v:number)=>Math.max(-.9,Math.min(.9,v));
-  return {king:bound(protectedMoves*.07+centerVisits*(remaining.martyr<=1?.12:.025)-exposure*.12),guard:bound(retreats*.07+protectedMoves*.02-advances*.025),martyr:bound(advances*.08+progress*.04+exposure*.1-retreats*.05)};
+  const home=enemy==='red'?6:0,progress=Math.abs(p.y-home);
+  const moves=o.history.filter(h=>h.id===p.id);
+  const advances=moves.filter(h=>!h.captured&&Math.abs(h.to.y-home)>Math.abs(h.from.y-home)).length;
+  const captures=moves.filter(h=>h.captured).length;
+  const support=o.pieces.some(q=>q.side===enemy&&q.id!==p.id&&dist(q,p)===1);
+  const exposed=o.pieces.some(q=>q.side===o.side&&dist(q,p)===1);
+  const rush=Math.min(3,advances)*.28+Math.max(0,progress-1)*.22;
+  const offered=Math.min(2,offers.get(p.id)??0)*.38+(exposed&&!support?.46:0);
+  const sheltered=progress<=1&&support?.35:0;
+  const bound=(n:number)=>Math.max(-2.4,Math.min(2.4,n));
+  return {king:bound(sheltered-rush*.65-offered),guard:bound(sheltered*.55+Math.min(2,captures)*.25-offered*.28),
+   martyr:bound(rush+offered-sheltered-Math.min(2,captures)*.18)};
  });
  const worlds:IdentityWorld[]=[];
  const visit=(i:number,assigned:Role[],log:number)=>{
