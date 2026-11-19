@@ -1,0 +1,91 @@
+/* Keep the status and controls in their own rows outside the playable area. */
+.altar-notice-slot { min-height: 0; width: 100%; display: grid; place-items: center; }
+.phase-play .altar-notice-slot { min-height: 48px; }
+.altar-notice-slot .altar-state-banner {
+  position: static; inset: auto; transform: none; width: auto; min-width: 0;
+  max-width: 100%; padding: 5px 13px; animation: none; box-shadow: none;
+}
+.altar-notice-slot .altar-state-banner > div { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 12px; }
+.altar-notice-slot .altar-state-banner strong { font-size: 14px; line-height: 1.4; letter-spacing: .09em; }
+.altar-notice-slot .altar-state-banner small { margin: 0; font-size: 11px; white-space: normal; }
+.board-interface > .camera-controls {
+  position: static; inset: auto; flex: none; align-self: flex-end;
+  margin: 0 0 5px; background: #121f28; box-shadow: none;
+}
+.board-interface > .camera-controls button { min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.game-layout, .board-hud, .impact-disclosure, .reveal-overlay, .result-copy {
+  font-family: 'Noto Serif CJK SC', 'Songti SC', SimSun, 'Court Serif', serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.game-layout button, .board-hud button { line-height: 1.5; }
+.credits-details a { color: #f0d8a4; text-underline-offset: .22em; }
+.credits-details a svg { vertical-align: middle; }
+@media (min-width: 801px) {
+  .phase-play .game-scene { top: 216px; }
+  .phase-play .game-scene, .phase-setup .game-scene { bottom: 167px; }
+}
+@media (max-width: 800px) {
+  .phase-play .game-layout .board-interface { height: calc(112px + min(105vw, 49dvh) + 150px); }
+  .phase-setup .game-layout .board-interface { height: calc(64px + min(105vw, 49dvh) + 150px); }
+  .phase-play .game-scene, .phase-play:has(.ritual-status) .game-scene { top: 176px; }
+  .phase-play.omniscient-match .game-layout .board-interface { height: calc(138px + min(105vw, 49dvh) + 150px); }
+  .phase-play.omniscient-match .game-scene { top: 202px; }
+  .board-interface > .camera-controls { align-self: center; }
+}
+@media (max-height: 500px) and (max-width: 950px) {
+  .phase-play .game-layout .board-interface, .phase-setup .game-layout .board-interface,
+  .phase-play.omniscient-match .game-layout .board-interface { height: calc(100dvh - 64px); }
+  .phase-play .game-scene, .phase-play:has(.ritual-status) .game-scene, .phase-setup .game-scene,
+  .phase-play.omniscient-match .game-scene { top: 64px; bottom: auto; width: 70%; height: calc(100dvh - 130px); }
+  .phase-play .altar-notice-slot { position: fixed; top: 96px; left: 6px; width: calc(15vw - 9px); }
+  .altar-notice-slot .altar-state-banner { display: grid; justify-items: center; padding: 5px; }
+  .board-interface > .camera-controls { position: fixed; right: 6px; bottom: 10px; max-width: calc(15vw - 9px); flex-wrap: wrap; justify-content: center; }
+}
+.match-vignette {
+  --scene-length: 850ms;
+  position: fixed; inset: 0; z-index: 42; pointer-events: none;
+  display: grid; place-content: center; justify-items: center;
+  background: radial-gradient(ellipse at 50% 45%, #1b2134 0, #090e17f7 56%, #060910fc);
+  color: #f3dfb2; text-align: center;
+  animation: match-vignette var(--scene-length) ease both;
+}
+.match-vignette-art { width: min(68vw, 310px, 61vh); color: #e3c998; }
+.match-vignette-art > svg { width: 100%; display: block; }
+.match-vignette-copy strong { font-size: clamp(1rem, 4vw, 1.55rem); letter-spacing: .15em; }
+.match-vignette-copy p { margin: .45em 0 0; line-height: 1.5; }
+.match-vignette[data-outcome='loss'] .entrance-actor { animation: opponent-falls .66s ease-in both; }
+.match-vignette[data-outcome='win'] .entrance-actor { animation: opponent-rises .65s ease-out both; }
+.match-vignette.still { --scene-length: 180ms; }
+.match-vignette.still svg * { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .match-vignette { --scene-length: 180ms; }
+  .match-vignette svg * { animation: none !important; }
+}
+@keyframes match-vignette {
+  0%, 100% { opacity: 0; visibility: hidden; }
+  12%, 73% { opacity: 1; visibility: visible; }
+}
+@keyframes opponent-falls {
+  from { opacity: 1; transform: none; }
+  to { opacity: .38; transform: translateY(16px) rotate(-4deg); }
+}
+@keyframes opponent-rises {
+  from { opacity: .35; transform: translateY(14px) scale(.94); }
+  to { opacity: 1; transform: translateY(-5px) scale(1.04); }
+}
+.match-vignette[data-outcome='loss'] .entrance-prop { animation: opponent-seal-break .66s ease-in both; }
+.match-vignette[data-outcome='win'] .entrance-sigil { animation: opponent-seal-rise .72s ease-out both; }
+.match-vignette[data-outcome='loss'] [data-rank='easy'] { --fall-x: -8px; --fall-angle: -12deg; }
+.match-vignette[data-outcome='loss'] [data-rank='normal'] { --fall-x: 18px; --fall-angle: 35deg; }
+.match-vignette[data-outcome='loss'] [data-rank='hard'] { --fall-x: -12px; --fall-angle: -37deg; }
+.match-vignette[data-outcome='loss'] [data-rank='master'] { --fall-x: 6px; --fall-angle: 28deg; }
+.match-vignette[data-outcome='loss'] [data-rank='omniscient'] { --fall-x: 0px; --fall-angle: 0deg; }
+.match-vignette.still .opponent-entrance * { animation: none !important; }
+@keyframes opponent-seal-break {
+  0%, 24% { opacity: 1; transform: none; }
+  100% { opacity: .08; transform: translate(var(--fall-x), 19px) rotate(var(--fall-angle)) scale(.66); }
+}
+@keyframes opponent-seal-rise {
+  from { opacity: .18; transform: scale(.78) rotate(-12deg); }
+  to { opacity: .8; transform: scale(1.08); }
+}

@@ -32,12 +32,12 @@ const {launch,openGame,holdFrame}=require('./support.cjs');
    for(const progress of [.2,.5,.8]){
     await holdFrame(page,progress);
     const body=await page.evaluate(id=>window.__SK_QA__.bodyDrawProbe(id),id);
-    assert.equal(body.role,role);assert.ok(body.visible&&body.draws>0);assert.equal(body.batched,false);
+    assert.equal(body.role,role);assert.ok(body.visible&&body.draws>0&&body.bodyHeight>.5);assert.equal(body.batched,false);
    }
    await page.evaluate(()=>window.__SK_QA__.holdAction(null));
    await page.waitForFunction(()=>{const s=window.__SK_QA__.snapshot();return s.game.turn==='red'&&!s.busy;});
    const settled=await page.evaluate(id=>window.__SK_QA__.bodyDrawProbe(id),id);
-   assert.equal(settled.batched,false);assert.ok(settled.draws>0);
+   assert.equal(settled.batched,false);assert.ok(settled.draws>0&&settled.bodyHeight>.5);
    console.log('PASS',role,'body draws throughout AI movement and after landing');
   }
   assert.deepEqual(errors,[]);

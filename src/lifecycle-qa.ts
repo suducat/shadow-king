@@ -1,4 +1,4 @@
-import {Mesh} from "three";
+import {Mesh,Vector3} from "three";
 import type { BoardScene } from './scene';
 import { fixture } from './qa';
 import { viewFor, move, type VisiblePiece } from './game';
@@ -83,5 +83,6 @@ export function bodyDrawProbe(scene:BoardScene,id:string){
   restore.push(()=>{object.onBeforeRender=previous;});
  });
  try{scene.renderer.render(scene.scene,scene.camera);}finally{restore.forEach(reset=>reset());}
- return {draws,batched:scene.batches.stats.instances.includes(id),role:actor.role,visible:actor.model.visible};
+ const bodyHeight=actor.rig.body.getWorldPosition(new Vector3()).y-actor.group.getWorldPosition(new Vector3()).y;
+ return {draws,bodyHeight,batched:scene.batches.stats.instances.includes(id),role:actor.role,visible:actor.model.visible};
 }

@@ -206,7 +206,7 @@ function buildCharacter(role:VisibleRole,side:Side):Character {
   for(const part of Object.values(rig)){part.userData.bindPosition=part.position.toArray();part.userData.bindRotation=part.rotation.toArray();}
   batch(model);
   // A uniform scale keeps all base positions and visual footprints tied to one cell.
-  model.rotation.y=role==='unknown'?(side==='red'?Math.PI:0):(side==='red'?0:Math.PI);
+  model.rotation.y=side==='red'?Math.PI:0;
   const pick=bodyPickMesh(role);
   return {model,pick,rig};
 }
@@ -223,6 +223,9 @@ export function createCharacter(role:VisibleRole,side:Side,quality:Quality='high
     templates.set(key,source);
   }
   const model=source.model.clone(true),part=(name:string)=>model.getObjectByName('rig-'+name) as T.Group,rig:CharacterRig={body:part('body'),leftLeg:part('leftLeg'),rightLeg:part('rightLeg'),crown:part('crown'),weapon:part('weapon'),cape:part('cape'),leftArm:part('leftArm'),rightArm:part('rightArm'),seal:part('seal')};
+  // Object3D.clone copies the quaternion. Retain the authored yaw too:
+  // decomposing a half-turn can otherwise introduce 180° roll and pitch.
+  model.rotation.copy(source.model.rotation);
   // Geometry/textures are immutable and cached. Opacity and other material
   // properties belong to ONE actor, including after a perspective replacement.
   const materials=new Map<string,T.Material>();

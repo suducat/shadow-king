@@ -45,8 +45,7 @@ function makeActor(p: VisiblePiece,quality:Quality): Actor {
   const materials=new Map<T.Material,{opacity:number;transparent:boolean;depthWrite:boolean}>();model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material]))materials.set(m,{opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite});});
   const rest=()=>{group.scale.setScalar(1);group.visible=true;for(const p of poses){p.part.visible=true;p.part.position.copy(p.position);p.part.rotation.copy(p.rotation);p.part.scale.copy(p.scale);}model.traverse(o=>{if(o instanceof T.Mesh)o.visible=true;});for(const[m,r]of materials){const changed=m.transparent!==r.transparent||m.depthWrite!==r.depthWrite;m.opacity=r.opacity;m.transparent=r.transparent;m.depthWrite=r.depthWrite;if(changed)m.needsUpdate=true;}};
   group.userData={x:p.x,y:p.y,actorId:p.id};
-  if(p.revealed)model.traverse(object=>{if(object instanceof T.Mesh)object.frustumCulled=false;});
-  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0,publicIdentity:!!p.revealed};
+  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0,publicIdentity:false};
 }
 
 type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean;fracture?:T.Group;};
@@ -63,6 +62,8 @@ export class BoardScene {
   actors = new Map<string, Actor>();
   tiles: T.Mesh[] = [];
   marks = new T.Group();
+  fallen = new T.Group();
+  private fallenKeys:string[] = [];
   private boardMarks=new BoardMarks(this.marks);
   batches=new RigidBatches(this.root);
   batchingEnabled=true;
@@ -120,7 +121,7 @@ export class BoardScene {
     this.environment=pmrem.fromScene(room,.04,.1,100,{size:128});this.scene.environment=this.environment.texture;this.scene.environmentIntensity=.8;
     room.dispose();pmrem.dispose();
     this.scene.fog = new T.FogExp2(0x0b1319, .024);
-    this.scene.add(this.root); this.root.add(this.marks);this.fx=new BattleEffects(this.root);
+    this.scene.add(this.root); this.root.add(this.marks,this.fallen);this.fx=new BattleEffects(this.root);
     this.scene.add(new T.AmbientLight(0xa6bdca, .92));
     const key = new T.DirectionalLight(0xffe3be, 3.1); key.position.set(-4, 12, 7); key.castShadow = true;this.keyLight=key;
     key.shadow.mapSize.set(1024, 1024); key.shadow.camera.left = -7; key.shadow.camera.right = 7; key.shadow.camera.top = 7; key.shadow.camera.bottom = -7; key.shadow.normalBias = .035; this.scene.add(key);
@@ -277,7 +278,50 @@ export class BoardScene {
     for(const[id,actor]of this.actors)this.removeActor(id,actor);
     this.update(this.state);this.resize();this.dirty=true;
   }
+  setFallen(captures:readonly Capture[]){
+    const keys=captures.map(({side,role})=>side+'/'+role);
+    let common=0;
+    while(common<keys.length&&keys[common]===this.fallenKeys[common])common++;
+    if(common===keys.length&&common===this.fallenKeys.length)return;
+    this.fallenKeys=keys;
+    for(const spirit of this.fallen.children.slice(common)){
+      this.disposeGroup(spirit);spirit.removeFromParent();
+    }
+    const slots={red:0,blue:0};
+    for(const {side} of captures.slice(0,common))slots[side]++;
+    for(const {side,role} of captures.slice(common)){
+      const {model,pick}=createCharacter(role,side,'low');
+      pick.geometry.dispose();(pick.material as T.Material).dispose();
+      model.rotation.set(0,0,0);
+      model.updateMatrixWorld(true);
+      const parts:T.BufferGeometry[]=[];
+      const replaced=new Set<T.Material>();
+      model.traverse(object=>{
+        if(!(object instanceof T.Mesh))return;
+        for(const material of Array.isArray(object.material)?object.material:[object.material])replaced.add(material);
+        const source=object.geometry as T.BufferGeometry;
+        const part=source.index?source.toNonIndexed():source.clone();
+        part.applyMatrix4(object.matrixWorld);
+        for(const attribute of Object.keys(part.attributes))if(attribute!=='position')part.deleteAttribute(attribute);
+        parts.push(part);
+      });
+      const geometry=mergeGeometries(parts);
+      parts.forEach(part=>part.dispose());replaced.forEach(material=>material.dispose());
+      if(!geometry)continue;
+      const tint=side==='red'?0xf0b3a5:0x9aeaff;
+      const spectral=new T.MeshBasicMaterial({color:tint,transparent:true,opacity:.49,depthWrite:false});
+      const spirit=new T.Mesh(geometry,spectral);
+      const lane=side==='red'?1:-1;
+      spirit.position.set(lane*3.75,.19,(slots[side]++-3)*.69);
+      spirit.scale.setScalar(.34);
+      spirit.rotation.y=-lane*Math.PI/2;
+      spirit.userData={role,side};
+      this.fallen.add(spirit);
+    }
+    this.dirty=true;
+  }
   resetActors() {
+    this.setFallen([]);
     this.batches.clear();this.cancelMove();
     for(const[id,actor]of this.actors)this.removeActor(id,actor);
     this.fx.reset();this.audioQueue=[];this.clearCameraImpulse();
@@ -363,7 +407,6 @@ export class BoardScene {
     }
     const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,step=tr.steps[index],from=index?cellToWorld(tr.steps[index-1].x,tr.steps[index-1].y,.18):tr.from,to=cellToWorld(step.x,step.y,.18),dir=to.clone().sub(from).setY(0).normalize(),actor=tr.actor;
     actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=sample.lift+tr.startLift*(1-smooth(progress/.28));
-    actor.model.rotation.z=0;
     if(tr.execution&&!tr.line.reduced&&!tr.silent){
       const focus=smooth(progress/.14)*(1-smooth((progress-.79)/.20));
       this.executionShade.style.opacity=String(.84*focus);
