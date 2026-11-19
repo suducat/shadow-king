@@ -16,7 +16,7 @@ import { bodyPickMesh, cellToWorld, clientToNDC, intersectBoard,resolvePick } fr
 
 type SceneState = { pieces: VisiblePiece[]; selected: string | null; legal: { x: number; y: number }[]; viewer: Side | null; cinematic: boolean; reduced: boolean; deployment: boolean; active: boolean; mode?:GameMode; ritual?:Rites; preview?:ActionStep[]; pendingCharge?:string|null };
 type Unseal={start:number;color:number;surfaces:Map<T.MeshStandardMaterial,{color:T.Color;intensity:number}>};
-type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; unseal?:Unseal; rest:()=>void; disposed:boolean;facing:number };
+type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; unseal?:Unseal; publicIdentity:boolean; rest:()=>void; disposed:boolean;facing:number };
 const GOLD = 0xb7955d, RED = 0xd7654e, BLUE = 0x6ca9bd;
 const mat = (color: T.ColorRepresentation, metalness = .55, roughness = .42) => new T.MeshStandardMaterial({ color, metalness, roughness });
 const metal = mat(GOLD, .8, .3), darkMetal = mat(0x403b2d, .76, .35), obsidian = mat(0x111c20, .6, .5);
@@ -45,7 +45,8 @@ function makeActor(p: VisiblePiece,quality:Quality): Actor {
   const materials=new Map<T.Material,{opacity:number;transparent:boolean;depthWrite:boolean}>();model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material]))materials.set(m,{opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite});});
   const rest=()=>{group.scale.setScalar(1);group.visible=true;for(const p of poses){p.part.visible=true;p.part.position.copy(p.position);p.part.rotation.copy(p.rotation);p.part.scale.copy(p.scale);}model.traverse(o=>{if(o instanceof T.Mesh)o.visible=true;});for(const[m,r]of materials){const changed=m.transparent!==r.transparent||m.depthWrite!==r.depthWrite;m.opacity=r.opacity;m.transparent=r.transparent;m.depthWrite=r.depthWrite;if(changed)m.needsUpdate=true;}};
   group.userData={x:p.x,y:p.y,actorId:p.id};
-  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0};
+  if(p.revealed)model.traverse(object=>{if(object instanceof T.Mesh)object.frustumCulled=false;});
+  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0,publicIdentity:!!p.revealed};
 }
 
 type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean;fracture?:T.Group;};
@@ -126,7 +127,17 @@ export class BoardScene {
     const cold = new T.DirectionalLight(0x7cc0e3, 2.4); cold.position.set(5, 5, -7); this.scene.add(cold);
     const rim = new T.PointLight(0xa3bed2, 8, 18); rim.position.set(-6, 3, -4); this.scene.add(rim);
     this.makeBoard(); this.makeHall();
-    this.scene.onBeforeRender=()=>{if(this.batchingEnabled)this.batches.sync([...this.actors].map(([id,a])=>({id,model:a.model,exclude:a.disposed||!!a.unseal||this.transition?.id===id||!!this.transition?.victims.some(v=>v.actor===a)})),true);};
+    this.scene.onBeforeRender=()=>{
+      if(!this.batchingEnabled)return;
+      this.batches.sync([...this.actors].map(([id,actor])=>({
+        id,model:actor.model,
+        // Public opponents keep the same draw path before, during and after
+        // acting. A renderer batch must not take ownership of their meshes.
+        exclude:actor.disposed||!!actor.unseal||
+          (actor.publicIdentity&&actor.side!==this.state.viewer)||
+          this.transition?.id===id||!!this.transition?.victims.some(v=>v.actor===actor),
+      })),true);
+    };
     this.scene.onAfterRender=()=>this.batches.restore();
     const positions = new Float32Array(100 * 3);
     for (let i = 0; i < 100; i++) { positions[i * 3] = (Math.random() - .5) * 22; positions[i * 3 + 1] = Math.random() * 7; positions[i * 3 + 2] = (Math.random() - .5) * 18; }
@@ -231,6 +242,7 @@ export class BoardScene {
         actor = makeActor(p,this.quality);this.root.add(actor.group); this.actors.set(p.id, actor);
       }
       if(!actor)continue;
+      if(p.revealed&&!deferred)this.keepPublicModel(actor);
       const target = new T.Vector3(p.x - 3, .18, p.y - 3);
       actor.group.userData = { x: p.x, y: p.y, actorId:p.id };
       if (actor.target.distanceTo(target) > .01) { actor.target.copy(target); actor.moving = next.reduced ? 0 : performance.now(); if ((next.reduced || next.deployment)&&this.transition?.id!==p.id) actor.group.position.copy(target); }
@@ -276,10 +288,17 @@ export class BoardScene {
     const next=makeActor({id,role,side:old.side,x:old.group.userData.x,y:old.group.userData.y},this.quality);next.group.position.copy(old.group.position);next.target.copy(old.target);
     next.facing=shortAngle(old.model.rotation.y+old.facing-next.model.rotation.y);this.removeActor(id,old);this.actors.set(id,next);this.root.add(next.group);for(const v of this.transition?.victims??[])if(v.actor===old)v.actor=next;
   }
+  private keepPublicModel(actor:Actor){
+    if(actor.publicIdentity)return;
+    actor.publicIdentity=true;
+    actor.model.traverse(object=>{if(object instanceof T.Mesh)object.frustumCulled=false;});
+  }
   unsealActor(id:string,role:'king'|'guard',now=performance.now()){
     this.revealActor(id,role);
     const actor=this.actors.get(id);
-    if(!actor||this.state.reduced||actor.unseal)return;
+    if(!actor)return;
+    this.keepPublicModel(actor);
+    if(this.state.reduced||actor.unseal)return;
     const color=role==='king'?0xffc361:0xc0edff;
     const surfaces:Unseal['surfaces']=new Map();
     actor.model.traverse(o=>{

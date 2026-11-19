@@ -1,3 +1,4 @@
+import {Mesh} from "three";
 import type { BoardScene } from './scene';
 import { fixture } from './qa';
 import { viewFor, move, type VisiblePiece } from './game';
@@ -67,4 +68,20 @@ export async function stressModels(scene:BoardScene){
  for(let i=0;i<sets.length;i++)for(let j=i+1;j<sets.length;j++)if([...sets[i]].some(m=>sets[j].has(m)))failures.push('shared mutable material');
  scene.renderer.render(scene.scene,scene.camera);
  return{moves,captures,interruptions,failures,states};
+}
+
+// Count actual colour-pass submissions from the figure, separately from its base.
+export function bodyDrawProbe(scene:BoardScene,id:string){
+ const actor=scene.actors.get(id);
+ if(!actor?.rig)return null;
+ let draws=0;
+ const restore:(()=>void)[]=[];
+ actor.rig.body.traverse(object=>{
+  if(!(object instanceof Mesh))return;
+  const previous=object.onBeforeRender;
+  object.onBeforeRender=(...args)=>{if(args[2]===scene.camera)draws++;previous.apply(object,args);};
+  restore.push(()=>{object.onBeforeRender=previous;});
+ });
+ try{scene.renderer.render(scene.scene,scene.camera);}finally{restore.forEach(reset=>reset());}
+ return {draws,batched:scene.batches.stats.instances.includes(id),role:actor.role,visible:actor.model.visible};
 }

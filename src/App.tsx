@@ -127,6 +127,7 @@ export default function App() {
       setBatching:(enabled:boolean)=>scene.current?.setBatching(enabled),
       combatFrame:async()=>{const q=await import('./combat-qa');return {...q.combatFrame(scene.current!),audio:sound.stats,audioCues:sound.accepted};},
       combatProbe:async()=>{const q=await import('./combat-qa');return q.combatProbe(scene.current!);},
+      bodyDrawProbe:async(id:string)=>{const q=await import('./lifecycle-qa');return q.bodyDrawProbe(scene.current!,id);},
       modelState:async()=>{const q=await import('./lifecycle-qa');return q.modelState(scene.current!);},
       holdAction:(progress:number|null)=>{if(scene.current)scene.current.debugActionProgress=progress;},
       stressV04:async()=>{const q=await import('./v04-qa');return q.stressV04(scene.current!);},
