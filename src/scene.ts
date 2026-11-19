@@ -188,7 +188,12 @@ export class BoardScene {
     this.batchStatic(columns);
   }
   update(next: SceneState) {
-    if(!next.active)next={...next,pieces:[]};
+    // A staged, noninteractive court portrait; never mutate a live match.
+    if(!next.active){
+      const king=next.pieces.find(p=>p.side==='red'&&p.role==='king');
+      const masks=next.pieces.filter(p=>p.side==='blue').slice(0,2);
+      next={...next,pieces:[...(king?[{...king,x:3,y:4}]:[]),...masks.map((p,i)=>({...p,x:i===0?2:4,y:2}))]};
+    }
     this.dirty=true;
     this.renderer.domElement.dataset.ready='false';
     const geometryChanged=next.pieces.length!==this.state.pieces.length||next.pieces.some(p=>!this.state.pieces.some(old=>old.id===p.id&&old.role===p.role&&old.x===p.x&&old.y===p.y));
@@ -329,7 +334,6 @@ export class BoardScene {
         material=victim.actor.role;
         if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,material);if(!tr.line.reduced&&this.state.cinematic&&(tr.execution||tr.publicBeats.decisive===i))this.cameraImpulse={at,direction:dir.clone()};}
       }
-      if(fresh&&cue.kind==='plant'&&!tr.line.attack&&!tr.line.charge&&!tr.execution&&!tr.line.reduced)this.fx.land(step.x,step.y,at);
       if(cue.kind==='recover'&&tr.pendingState&&!tr.ceremonyCommitted){tr.ceremonyCommitted=true;this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);}
       if(fresh){const kind=tr.execution&&tr.role!=='unknown'?`execution-${cue.kind}`:`battle-${tr.role}-${cue.kind}`;this.audioQueue.push({kind,options:{key:`${tr.groupKey}/${cueIndex}`,group:tr.groupKey,reduced:tr.line.reduced,material,decisive:cue.kind==='impact'&&tr.publicBeats.decisive===cue.index},at});}
     }
@@ -408,7 +412,6 @@ export class BoardScene {
   private animate = () => {
     if (this.dead) return;
     this.frame = requestAnimationFrame(this.animate);
-    if(!this.state.active)return;
     this.applyQuality();
     if(devicePixelRatio!==this.displayDensity)this.resize();
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, .05); this.last = now;

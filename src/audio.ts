@@ -35,7 +35,7 @@ export function cueLayers(kind:string,options:CueOptions={}):AudioLayer[]{
   if(options.decisive)layers.push(tone(49,.24,.095,36));
   return layers;
  }
- if(stage==='plant')return[grain(880,.022,.10),tone(role==='king'?83:96,.092,.18,46),grain(245,.070,.09)];
+ if(stage==='plant')return[grain(1450,.032,.14),tone(role==='king'?79:102,.10,.14,51),grain(285,.085,.08)];
  if(stage==='charged')return[tone(294,.3,.09,588),tone(880,.24,.04,660)];
  if(stage==='recover')return[tone(role==='guard'?440:196,.16,.025,146.83)];
  return[tone(146.83,.15,.055)];

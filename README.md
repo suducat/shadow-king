@@ -6,12 +6,6 @@
 
 普通落子、普通吃子和双目标斩杀的同机位录屏与帧号见[动作对照](https://suducat.github.io/shadow-king/review/motion/)。
 
-## 王庭场景与对局演出
-
-大厅、规则选择与五位对手的画面取自项目内的 Three.js 棋具。菜单使用预渲染图；正式版在进入棋局时创建实时棋盘。新旧画面对照可切换桌面与手机视口，并提供落子、吃子和祭典开启的同机位短片。[查看本次对照](https://suducat.github.io/shadow-king/review/night/)
-
-视觉基线为 Pages #15（`c25ca24`），实现从回退提交 `c4fc9b2` 开始。可在项目根目录用 `node scripts/night-studio/bake.cjs` 重新为菜单取景。
-
 ## 启动
 
 需要 Node.js 20.19+ 或 22.12+。

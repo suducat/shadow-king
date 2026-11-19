@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Volume2, VolumeX, Settings2, BookOpen, X, Shield, Crown, Sparkles, RotateCw, ZoomIn, ZoomOut, Maximize, Flag, EyeOff, Check, Shuffle, Swords, Info, LockKeyhole, Eye } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Volume2, VolumeX, Settings2, BookOpen, X, Shield, Crown, Sparkles, RotateCw, ZoomIn, ZoomOut, Maximize, Flag, EyeOff, ChevronRight, Check, Shuffle, Swords, Info, Monitor, Users, LockKeyhole, Eye } from 'lucide-react';
 import { BoardScene } from './scene';
-import { Hall, RuleSelection } from './NightMenu';
 import { OpponentSelect } from './OpponentSelect';
 import { PieceIcon } from './PieceIcon';
 import { EndCinematic } from './EndCinematic';
-import { CONFIG, createGame, startGame, swapSetup, legalMoves, act, allActions, viewFor, roleName, sideName, coord, type Game, type Side, type Role, type Capture } from './game';
+import { CONFIG, createGame, startGame, swapSetup, legalMoves, move, act, allActions, viewFor, roleName, sideName, coord, type Game, type Side, type Role, type Capture } from './game';
 import { sound } from './audio';
 import {publicBeats} from './battle-timeline';
 import type { FixtureName } from './qa';
@@ -70,9 +69,7 @@ export default function App() {
   const ritualMode=modeOf(game)==='ritual';
 
   useLayoutEffect(() => {
-    // The menu uses plates rendered from the actual pieces. Allocate its GPU
-    // context when a match starts. Test builds also expose standalone rig probes.
-    if (!sceneHost.current || scene.current || (!inGame && import.meta.env.MODE !== 'test')) return;
+    if (!sceneHost.current) return;
     try { scene.current = new BoardScene(sceneHost.current, (x, y) => clickRef.current(x, y)); }
     catch { setWebglError(true); }
     if(scene.current){
@@ -91,8 +88,8 @@ export default function App() {
         setMotionBoard(board=>board?{...board,captures:[...board.captures,c]}:board);
       };
     }
-  }, [inGame]);
-  useLayoutEffect(()=>()=>{scene.current?.destroy();scene.current=null;timers.current.forEach(clearTimeout);},[]);
+    return () => { scene.current?.destroy(); timers.current.forEach(clearTimeout); };
+  }, []);
   useLayoutEffect(() => {
     scene.current?.setQuality(prefs.quality);
     scene.current?.syncLayout();
@@ -154,8 +151,7 @@ export default function App() {
 
   const unlock = () => { void sound.unlock().catch(() => {}); };
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
-  useEffect(()=>{if(!notice)return;const timer=window.setTimeout(()=>setNotice(''),2200);return()=>window.clearTimeout(timer);},[notice]);
-  const cancelTurn = () => {setNotice(''); setMotionBoard(null);setImpactDisclosure(null);revealQueue.current=[];setChargeIntent(false);turnSequence.current++; aiStop.current(); clearTimers(); pending.current = null; scene.current?.cancelMove(); actionLocked.current=false;setBusy(false);setReveal(null);setSelected(null);sound.silenceEffects(); };
+  const cancelTurn = () => { setMotionBoard(null);setImpactDisclosure(null);revealQueue.current=[];setChargeIntent(false);turnSequence.current++; aiStop.current(); clearTimers(); pending.current = null; scene.current?.cancelMove(); actionLocked.current=false;setBusy(false);setReveal(null);setSelected(null);sound.silenceEffects(); };
   const finishPending = () => { setImpactDisclosure(null);if(revealQueue.current.length){setReveal(revealQueue.current.shift()!);sound.play('reveal');return;}clearTimers(); const done = pending.current; pending.current = null; setReveal(null); done?.(); };
   const prepareHandoff = (side: Side, next: 'setup' | 'play') => {
     sound.silenceEffects();setSelected(null); setViewer(null); setHandoff({ side, next }); setPhase('handoff'); actionLocked.current = false; setBusy(false);
@@ -191,9 +187,6 @@ export default function App() {
     void (motion??Promise.resolve(true)).then(completed=>{
       if(!completed||turnSequence.current!==token)return;
       setMotionBoard(null);
-      const broken=(['red','blue'] as const).find(side=>game.ritual?.[side].phase==='occupied'&&
-        (next.ritual?.[side].phase==='open'||caps.some(c=>c.side===side&&c.role==='king')));
-      if(broken)setNotice(sideName[broken]+' · 祭台占领被打断');
       if(caps.length){revealQueue.current=caps.slice(1);setImpactDisclosure(null);setReveal(caps[0]);sound.play('reveal');}else finishPending();
     });
   };
@@ -231,20 +224,24 @@ export default function App() {
     <div className="grain"/>
     <header className="topbar">
       <button className="brand" onClick={() => inGame ? openModal('leave') : setPhase('menu')} aria-label="暗王主菜单"><Crest/><span>暗王 <i>SHADOW KING</i></span></button>
-      <div className="header-center">{inGame ? <><span className="live-dot"/>{phase==='result'?'棋局结束':phase==='handoff'?'隐私交接':phase==='setup'?'布阵':busy?'动作播放':gameMode==='ai'?(game.turn==='red'?'你行动':'对手思考'): `${sideName[game.turn]}行动`} · {ritualMode?'祭典 · ':'经典 · '}{gameMode==='ai'?(difficulty==='omniscient'?'全知者 · 透视挑战':`人机对战 · ${DIFFICULTIES[difficulty].name}`):'本地双人'} <b>／</b> {phase === 'setup' || handoff.next === 'setup' && phase === 'handoff' ? '秘密布阵' : `第 ${Math.floor(game.ply / 2) + 1} 回合`}</> : null}</div>
-      <nav className="header-actions">{inGame && phase !== 'handoff' && <div className="hall-camera"><button onClick={() => scene.current?.rotate()} title="旋转棋盘" aria-label="旋转棋盘"><RotateCw size={16}/></button><span/><button onClick={() => setCameraZoom(-.1)} title="缩小" aria-label="缩小"><ZoomOut size={16}/></button><button onClick={() => setCameraZoom(.1)} title="放大" aria-label="放大"><ZoomIn size={16}/></button><button onClick={() => { scene.current?.resetCamera(); setZoom(1); }} title="重置视角" aria-label="重置视角"><Maximize size={15}/></button></div>}{!inGame&&<button className="icon-button" onClick={()=>openModal('credits')} aria-label="制作信息" title="制作信息"><Info size={16}/></button>}<button className="icon-button" onClick={() => setPrefs({ ...prefs, muted: !prefs.muted })} title={prefs.muted ? '开启声音' : '静音'} aria-label={prefs.muted ? '开启声音' : '静音'}>{prefs.muted ? <VolumeX size={17}/> : <Volume2 size={17}/>}</button><button className="icon-button" onClick={() => openModal('settings')} aria-label="设置" title="设置"><Settings2 size={17}/></button><span className="edition">第一章 · 永夜王庭</span></nav>
+      <div className="header-center">{inGame ? <><span className="live-dot"/>{phase==='result'?'棋局结束':phase==='handoff'?'隐私交接':phase==='setup'?'布阵':busy?'动作播放':gameMode==='ai'?(game.turn==='red'?'你行动':'对手思考'): `${sideName[game.turn]}行动`} · {ritualMode?'祭典 · ':'经典 · '}{gameMode==='ai'?(difficulty==='omniscient'?'全知者 · 透视挑战':`人机对战 · ${DIFFICULTIES[difficulty].name}`):'本地双人'} <b>／</b> {phase === 'setup' || handoff.next === 'setup' && phase === 'handoff' ? '秘密布阵' : `第 ${Math.floor(game.ply / 2) + 1} 回合`}</> : <><span className="tiny-diamond"/> 神秘 · 谋略 · 命运 <span className="tiny-diamond"/></>}</div>
+      <nav className="header-actions"><button className="icon-button" onClick={() => setPrefs({ ...prefs, muted: !prefs.muted })} title={prefs.muted ? '开启声音' : '静音'} aria-label={prefs.muted ? '开启声音' : '静音'}>{prefs.muted ? <VolumeX size={17}/> : <Volume2 size={17}/>}</button><button className="icon-button" onClick={() => openModal('settings')} aria-label="设置" title="设置"><Settings2 size={17}/></button><span className="edition">第一章 · 永夜王庭</span></nav>
     </header>
 
     <div className={`scene-wrap ${inGame ? 'game-scene' : 'menu-scene'}`}>
       <div ref={sceneHost} className="scene-host"/>
       {webglError && <div className="fallback-board" role="group" aria-label="兼容模式棋盘">{Array.from({ length: 49 }, (_, i) => { const x = i % 7, y = Math.floor(i / 7), p = visible.find(q => q.x === x && q.y === y); return <button key={i} className={`${(x + y) % 2 ? 'dark' : ''} ${moves.some(m => m.x === x && m.y === y) ? 'legal' : ''}`} aria-label={`${coord(x, y)} ${p ? `${sideName[p.side]} ${roleName[p.role]}` : '空格'}`} onClick={() => clickRef.current(x, y)}>{p && <PieceIcon role={p.role} className={p.side}/>}</button>; })}</div>}
+      {!inGame && <><div className="scene-caption"><span className="overline">THE COURT OF ETERNAL NIGHT</span><span>永夜王庭</span><i>七枚棋子 · 三种命运</i></div><div className="scene-bottom"><span>✧</span> 每一张面孔之下，都藏着另一种命运 <span>✧</span></div></>}
+      {inGame && phase !== 'handoff' && <div className="camera-controls"><button onClick={() => scene.current?.rotate()} title="旋转棋盘" aria-label="旋转棋盘"><RotateCw size={16}/></button><span/><button onClick={() => setCameraZoom(-.1)} title="缩小" aria-label="缩小"><ZoomOut size={16}/></button><button onClick={() => setCameraZoom(.1)} title="放大" aria-label="放大"><ZoomIn size={16}/></button><button onClick={() => { scene.current?.resetCamera(); setZoom(1); }} title="重置视角" aria-label="重置视角"><Maximize size={15}/></button></div>}
     </div>
 
     {ritualMode&&phase==='play'&&!reveal&&!modal&&<BoardHUD scene={scene} game={publicBoard} pieces={hudPieces} selected={selectedPiece} legal={moves} chargeIntent={chargeIntent} canAct={!busy&&viewer===game.turn&&(gameMode!=='ai'||game.turn==='red')} charge={()=>{setChargeIntent(true);sound.play('charge',{group:'charge-preview'});}} cancel={()=>{setChargeIntent(false);setSelected(null);}} execute={executeAction}/>}
     {phase==='play'&&busy&&!reveal&&<button className="skip-battle" onClick={()=>{sound.silenceEffects();scene.current?.skipMove();}}>跳过动作</button>}
-    {phase==='menu'&&<Hall start={()=>setPhase('mode')} rules={()=>openModal('rules')}/>}
-    {phase==='mode'&&<RuleSelection rule={rulesMode} choose={setRulesMode} back={()=>setPhase('menu')} local={()=>newMatch('local')} ai={()=>setPhase('difficulty')}/>}
-    {phase==='difficulty'&&<OpponentSelect difficulty={difficulty} rule={rulesMode} select={setDifficulty} back={()=>setPhase('mode')} start={()=>newMatch('ai',difficulty)}/>}
+    {!inGame && <main className="menu-content">
+      {phase === 'menu' ? <div className="hero-copy"><div className="eyebrow"><span/> A GAME OF HIDDEN FATES</div><h1>暗<span>王</span></h1><div className="english-title">SHADOW KING</div><div className="title-divider"><span/>◆<span/></div><h2>藏起王冠，改写命运。</h2><p className="intro">在永夜笼罩的王庭，身份是最后的秘密。<br/>你的一步，是谋略；他的牺牲，或是胜利。</p><button className="primary start-button" onClick={() => setPhase('mode')}><Swords size={18}/><span>开启棋局<small>ENTER THE COURT</small></span><ArrowRight size={20}/></button><div className="menu-links"><button onClick={() => openModal('rules')}><BookOpen size={15}/>快速玩法</button><span/><button onClick={() => openModal('credits')}><Info size={15}/>制作信息</button></div><div className="local-note"><Monitor size={13}/> 隐藏身份策略棋 · 人机 / 本地双人 · 无需注册</div></div> : phase==='difficulty'?<OpponentSelect difficulty={difficulty} rule={rulesMode} select={setDifficulty} back={()=>setPhase('mode')} start={()=>newMatch('ai',difficulty)}/> : <div className="mode-panel"><button className="text-back" onClick={() => setPhase('menu')}><ArrowLeft size={15}/>返回主菜单</button><div className="eyebrow">CHOOSE YOUR FATE</div><h2>选择规则与对手</h2><p>先选择规则模式，再选择对战方式。</p><div className="rules-selector" aria-label="规则模式"><button aria-pressed={rulesMode==='classic'} onClick={()=>setRulesMode('classic')}>经典模式<small>CLASSIC</small></button><button aria-pressed={rulesMode==='ritual'} onClick={()=>setRulesMode('ritual')}>祭典模式<small>RITE OF SHADOWS</small></button></div><p className="mode-rule-note">{rulesMode==='classic'?'原有规则：三死士全灭立即获胜，影卫无技能。':'实验规则：公开王争夺祭台；每名影卫独立一次向前斩杀。'}</p><button className="mode-card" onClick={() => newMatch('local')}><Users size={28} strokeWidth={1}/><div><strong>本地双人</strong><small>共用一台设备，轮流秘密执棋</small><em><span className="live-dot"/>现已开放</em></div><ChevronRight size={20}/></button><button className="mode-card" onClick={()=>setPhase('difficulty')}><Swords size={28} strokeWidth={1}/><div><strong>人机对战</strong><small>玩家执红 · 四档 AI ＋全知挑战</small><em><span className="live-dot"/>五位对手 · 离线对弈</em></div><ChevronRight size={20}/></button><div className="future-modes"><div><span>在线好友对战</span><LockKeyhole size={13}/><small>未来计划</small></div></div><details className="privacy-note"><summary>本地双人 · 隐私交接说明</summary><EyeOff size={18}/><p>每次交换执棋者前，棋局将被遮蔽。<br/>请在交接画面出现后，再将设备交给对方。</p></details></div>}
+    </main>}
+
+    {!inGame && <footer className="menu-footer"><div className="fate-item"><span className="roman">I</span><Crown size={22} strokeWidth={1}/><div><strong>弑王</strong><small>夺其王冠，终结王权</small></div></div><div className="fate-item"><span className="roman">II</span><Shield size={22} strokeWidth={1}/><div><strong>破阵</strong><small>击溃影卫，瓦解守护</small></div></div><div className="fate-item"><span className="roman">III</span><Sparkles size={22} strokeWidth={1}/><div><strong>献祭</strong><small>经典：三死士阵亡即胜；祭典：开启争夺祭台</small></div></div><div className="footer-motto">祭典须王占祭台，守过对手回应。<small>NOT EVERY CAPTURE IS A VICTORY.</small></div></footer>}
 
     {inGame && <main className="game-layout">
       <aside className="left-sidebar"><div className="overline">{phase === 'setup' ? 'THE SECRET DEPLOYMENT' : 'YOUR COURT'}</div><div className={`player-title ${viewer || handoff.side}`}><span className="side-gem"/><h2>{sideName[viewer || handoff.side]}</h2></div><div className="player-status" role="status" aria-live="polite"><span className="live-dot"/>{phase === 'setup' ? '正在秘密布阵' : phase === 'result' ? '棋局已结束' : busy?'动作播放中':gameMode==='ai'&&game.turn==='blue'?'对手正在思考……':`${sideName[game.turn]}行动`}</div><div className="ornament-line">◆</div>

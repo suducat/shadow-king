@@ -14,12 +14,6 @@ const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('P
  await load('opening');await pointer(3,3);await pointer(3,2,.14);await page.waitForSelector('.reveal-card');await page.getByRole('button',{name:'继续',exact:true}).click();await page.getByRole('button',{name:'我是蓝方，揭开帷幕'}).click();await settle();
  assert.equal((await snap()).fxState.altar,true);assert.match(await page.locator('.altar-state-banner').innerText(),/祭典开启/);assert.equal(await page.locator('.royal-rite').count(),1);await page.screenshot({path:path.join(root,'artifacts/v04-altar-open.png')});mark('正常缩放祭典开启、中央九格外框、王印和屏幕提示');
  await load('counter');assert.equal((await snap()).fxState.occupied,true);assert.match(await page.locator('.altar-state-banner').innerText(),/祭台占领中[\s\S]*一次完整回应/);await page.screenshot({path:path.join(root,'artifacts/v04-occupied.png')});mark('祭台占领中及一次回应窗口清晰显示');
- await page.evaluate(()=>{const observer=new MutationObserver(()=>{
-  if(document.querySelector('.toast')?.textContent.includes('祭台占领被打断')){window.__SAW_INTERRUPTION__=true;observer.disconnect();}
- });observer.observe(document.body,{subtree:true,childList:true,characterData:true});});
- await pointer(4,4);await page.getByRole('button',{name:'斩杀',exact:true}).click();await page.waitForSelector('.reveal-card');assert.equal(await page.evaluate(()=>window.__SAW_INTERRUPTION__),true);
- assert.equal((await snap()).game.result.reason,'king');mark('打断占领时明确提示，斩杀弑王仍按原规则结算');
- await load('ready');
  // Full animation, not reduced mode: collect a mid-dash screenshot then skip.
  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('#reduced').click();await page.getByRole('button',{name:'关闭',exact:true}).click();
  await load('ready');await page.evaluate(()=>window.__SK_QA__.holdAction(.46));await pointer(3,3);await page.getByRole('button',{name:'斩杀',exact:true}).click();await page.waitForFunction(()=>window.__SK_QA__.snapshot().fxState.action);await page.waitForTimeout(420);await page.screenshot({path:path.join(root,'artifacts/v04-execution.png')});

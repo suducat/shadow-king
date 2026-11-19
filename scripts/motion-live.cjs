@@ -7,7 +7,7 @@ const [stage,dist='dist-test']=process.argv.slice(2);
 (async()=>{
  const browser=await launch();
  try {
-  for(const name of (process.argv.length>4?process.argv.slice(4):['move','capture','execution'])){
+  for(const name of ['move','capture','execution']){
    const folder='artifacts/motion/'+stage+'/'+name;fs.mkdirSync(folder,{recursive:true});
    const {page,context,errors}=await openGame(browser,dist,{viewport:{width:1080,height:720},deviceScaleFactor:1,preferences:{quality:'low',reduced:false,effects:.65,music:0,muted:false,cinematic:false},recordVideo:{dir:folder,size:{width:1080,height:720}}});
    await page.addInitScript(()=>{
@@ -16,7 +16,7 @@ const [stage,dist='dist-test']=process.argv.slice(2);
     window.AudioContext=class extends Original{constructor(...args){super(...args);this.tap=this.createMediaStreamDestination();window.audioTap=this.tap;window.liveAudio=this;}};
    });
    await page.reload();await page.getByRole('button',{name:'设置',exact:true}).click();await page.getByRole('button',{name:'关闭',exact:true}).click();
-   await page.evaluate(name=>name==='rite'?window.__SK_QA__.loadRitualFixture('opening'):name==='execution'?window.__SK_QA__.loadRitualFixture('ready'):window.__SK_QA__.loadFixture('capture','guard'),name);
+   await page.evaluate(name=>name==='execution'?window.__SK_QA__.loadRitualFixture('ready'):window.__SK_QA__.loadFixture('capture','guard'),name);
    await page.waitForSelector('canvas[data-ready=true]');
    const click=async(x,y,h=.14)=>{const p=await page.evaluate(([x,y,h])=>window.__SK_QA__.project(x,y,h),[x,y,h]);await page.mouse.click(p.x,p.y);};
    await page.evaluate(async()=>{
