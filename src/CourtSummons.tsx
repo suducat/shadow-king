@@ -40,7 +40,10 @@ export function CourtSummons({rule,room,begin,toggle,cancel,back}:Props){
    <button className="primary" disabled={busy||secret.length!==6}><KeyRound size={16}/>确认入局</button>
   </form>}
   {busy&&<p role="status" className="court-message">{room.message||(room.side==='blue'?'正在回应邀约……':'正在发出邀约……')}</p>}
-  {room?.stage==='error'&&<p role="alert" className="court-message court-error">{room.message}</p>}
+  {room?.stage==='error'&&<>
+   <p role="alert" className="court-message court-error">{room.message}</p>
+   {room.side==='red'&&<button className="secondary" onClick={()=>begin('red')}>重新发起邀约</button>}
+  </>}
   {ready&&<div className="court-ready">
    <p role="status" className="court-message">{room.starting?'棋局启幕':'应邀者已至'}</p>
    {(['red','blue'] as const).map(side=>{

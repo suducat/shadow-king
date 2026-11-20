@@ -53,6 +53,10 @@ const publicState=s=>({
    p.on('pageerror',e=>errors.push(e.message));
    if(debug)p.on('console',entry=>console.log(i,entry.type(),entry.text()));
   });
+  await red.goto(base);
+  await press(red,'快速玩法');
+  const guide=red.getByRole('region',{name:'快速了解规则'});
+  await guide.getByText(/立刻获胜/).waitFor();
   await enter(red,'经典模式');
   await red.getByRole('button',{name:/发起邀约/}).click();
   const room=red.locator('.court-code');
@@ -67,8 +71,26 @@ const publicState=s=>({
   });
   console.log('PASS rule mismatch');
   await new Promise(r=>setTimeout(r,600));
-  await enter(blue,'经典模式');await join(blue,code);
+  await enter(blue,'经典模式');
+  await blue.evaluate(()=>{
+   const original=RTCDataChannel.prototype.send;
+   let interrupted=false;
+   window.courtEnrollments=0;
+   RTCDataChannel.prototype.send=function(data){
+    if(ArrayBuffer.isView(data)){
+     const text=new TextDecoder().decode(data);
+     if(text.includes('"type":"enroll"')){
+      window.courtEnrollments++;
+      if(!interrupted){interrupted=true;return;}
+     }
+    }
+    return original.call(this,data);
+   };
+  });
+  await join(blue,code);
   await Promise.all([ready(red),ready(blue)]);
+  assert.equal(await blue.evaluate(()=>window.courtEnrollments),2);
+  console.log('PASS fresh retry after an interrupted handshake, without replacing the invite');
   await enter(third,'经典模式');await join(third,code);
   await status(third,'此局已有执棋者。');
   await press(red,'就位');
@@ -98,12 +120,29 @@ const publicState=s=>({
    assert.deepEqual(publicState(await snap(red)),publicState(await snap(blue)));
   }
   console.log('PASS classic pairing, rule mismatch, occupied room, ready/cancel, alternating moves, touch, capture disclosure');
-  if((await snap(red)).game.result)await press(red,'离开王庭');
-  else{await press(red,'离开王庭');await red.getByRole('dialog').getByRole('button',{name:'离开王庭',exact:true}).click();}
-  if(!(await snap(blue)).game.result){
-   await blue.getByRole('alertdialog').getByText('对方暂离王庭').waitFor();
-   await blue.getByRole('alertdialog').getByRole('button',{name:'离开王庭',exact:true}).click();
+  if(!(await snap(red)).game.result){
+   await press(red,'认输');await press(red,'确认认输');
   }
+  await Promise.all([red.waitForSelector('.phase-result'),blue.waitForSelector('.phase-result')]);
+  await press(blue,'再来一局');
+  await red.getByText('对方想再来一局。').waitFor();
+  assert.equal((await snap(red)).phase,'result');
+  await press(red,'再来一局');
+  await Promise.all([draw(red),draw(blue)]);
+  for(const p of [red,blue]){
+   const fresh=await snap(p);
+   assert.equal(fresh.game.ply,0);
+   assert.equal(fresh.game.captures.length,0);
+   assert.equal(fresh.rendered.filter(q=>q.role==='unknown').length,7);
+  }
+  await cell(red,3,6);await cell(red,3,5);
+  await Promise.all([settled(red,1),settled(blue,1)]);
+  console.log('PASS same-channel rematch, fresh secrets and advancing turns');
+  await press(red,'离开王庭');
+  await red.getByRole('dialog').getByRole('button',{name:'离开王庭',exact:true}).click();
+  const pause=blue.getByRole('alertdialog');
+  await pause.getByText('对方暂离王庭').waitFor();
+  await pause.getByRole('button',{name:'离开王庭',exact:true}).click();
   await red.getByRole('heading',{name:'选择规则与对手'}).waitFor();
   console.log('PASS departure and room cleanup');
 
@@ -111,6 +150,9 @@ const publicState=s=>({
   await enter(blue,'祭典模式');await room.waitFor();await join(blue,await room.textContent());
   await Promise.all([ready(red),ready(blue)]);
   await press(red,'就位');await press(blue,'就位');await Promise.all([draw(red),draw(blue)]);
+  await press(red,'规则手册');
+  await guide.getByText(/撑过对方一回合才赢/).waitFor();
+  await press(red,'关闭');
   const guard=(await snap(red)).rendered.find(q=>q.side==='red'&&q.role==='guard');
   await cell(red,guard.x,6);await press(red,'蓄力');await press(red,'原地完成蓄力');
   await Promise.all([settled(red,1),settled(blue,1)]);

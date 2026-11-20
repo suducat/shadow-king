@@ -7,7 +7,7 @@ import {
  resolveOnline,settleRepetition,verifyOpenings,type Commitments,type Opening,
 } from './online-rules';
 
-const protocol=1,gameVersion='0.8.1';
+const protocol=2,gameVersion='0.8.1';
 const namespace='shadow-king-summons-v1-';
 const failure='邀约未能建立，请重试。';
 const signalFailure='暂时无法连接邀约服务，请检查网络后重试。';
@@ -17,7 +17,7 @@ const full='此局已有执棋者。';
 const absent='对方暂离王庭';
 const identifier=()=>crypto.randomUUID();
 const code=()=>String(crypto.getRandomValues(new Uint32Array(1))[0]%1_000_000).padStart(6,'0');
-type State={stage:'opening'|'waiting'|'connecting'|'ready'|'playing'|'error';code:string;side:Side;ready:boolean;otherReady:boolean;starting:boolean;message:string;pending:boolean};
+type State={stage:'opening'|'waiting'|'connecting'|'ready'|'playing'|'error';code:string;side:Side;ready:boolean;otherReady:boolean;starting:boolean;message:string;pending:boolean;rematchRequested:boolean;opponentRematch:boolean};
 type Packet=Record<string,unknown>;
 type Turn={match:string;ply:number;op:string;side:Side;action:GameAction};
 type Pending={turn:Turn;next?:Game;matches?:number[]};
@@ -39,6 +39,7 @@ export class CourtSession{
  private peer?:PeerInstance;
  private channel?:DataConnection;
  private peerGeneration=0;
+ private resumeHost?:()=>void;
  private closed=false;
  private failed=false;
  private timer?:ReturnType<typeof setTimeout>;
@@ -47,6 +48,7 @@ export class CourtSession{
  private mailbox=Promise.resolve();
  private match='';
  private offer='';
+ private rematchId='';
  private secrets:Opening[]=[];
  private roles=new Map<string,Role>();
  private hashes:Commitments={};
@@ -60,7 +62,7 @@ export class CourtSession{
 
  constructor(private rule:GameMode,side:Side,secret:string,private publish:(s:State)=>void,
   private onStart:(g:Game,side:Side)=>void,private onTurn:(turn:TurnDisplay)=>void){
-  this.state={stage:side==='red'?'opening':'connecting',code:secret,side,ready:false,otherReady:false,starting:false,message:'',pending:false};
+  this.state={stage:side==='red'?'opening':'connecting',code:secret,side,ready:false,otherReady:false,starting:false,message:'',pending:false,rematchRequested:false,opponentRematch:false};
  }
  private update(next:Partial<State>){this.state={...this.state,...next};if(!this.closed)this.publish(this.state);}
  private arm(message=failure,ms=18_000,onTimeout=()=>this.fail(message)){
@@ -74,8 +76,8 @@ export class CourtSession{
  }
  private release(){
   clearTimeout(this.timer);clearInterval(this.heartbeat);
-  this.channel?.close();this.peer?.destroy();
-  this.channel=undefined;this.peer=undefined;
+  this.detachChannel();this.peer?.destroy();
+  this.peer=undefined;this.resumeHost=undefined;
   this.wait=undefined;this.secrets=[];this.roles.clear();this.history.clear();this.game=undefined;
  }
  close(){
@@ -91,23 +93,59 @@ export class CourtSession{
   this.update({message:'正在连接邀约服务……'});this.arm(signalFailure,9000);
   try{
    const {default:Peer}=await import('peerjs');
-   const signal=import.meta.env.MODE==='test'&&import.meta.env.VITE_PEER_TEST_PORT?
-    {host:'127.0.0.1',port:Number(import.meta.env.VITE_PEER_TEST_PORT),path:'/',secure:false,config:{iceServers:[]}}:
-    {secure:true,config:await courtIce()};
-   if(!this.active)return;
-   let attempts=0;
-   const allocate=()=>{
-    const host=this.state.side==='red',generation=++this.peerGeneration;
+   const testPort=import.meta.env.MODE==='test'?import.meta.env.VITE_PEER_TEST_PORT:undefined;
+   const host=this.state.side==='red';
+   const visit=identifier();
+   let collisions=0,retried=false,relayOnly=false;
+   const allocate=async()=>{
+    const generation=++this.peerGeneration;
+    this.detachChannel();
+    this.peer?.destroy();
+    this.arm(signalFailure,9000);
     const room=host?code():this.state.code;
+    const signal=testPort?
+     {host:'127.0.0.1',port:Number(testPort),path:'/',secure:false,config:{iceServers:[]}}:
+     {secure:true,config:{...await courtIce(),...(relayOnly?{iceTransportPolicy:'relay' as const}:{})}};
+    if(!this.active||generation!==this.peerGeneration)return;
     const peer=host?new Peer(namespace+room,signal):new Peer(signal);
     this.peer=peer;
+    let registered=false,reconnected=false;
+    const current=()=>this.active&&generation===this.peerGeneration;
+    this.resumeHost=host?()=>{
+     if(!current()||!peer.disconnected)return;
+     if(!registered||reconnected){this.fail(signalFailure);return;}
+     reconnected=true;
+     this.update({stage:'opening',message:'正在恢复邀约服务……'});
+     this.arm(signalFailure,9000);
+     try{peer.reconnect();}catch{this.fail(signalFailure);}
+    }:undefined;
+    const retryJoin=(message:string)=>{
+     if(!current())return;
+     if(host||retried||this.state.stage!=='connecting'){this.fail(message);return;}
+     retried=true;relayOnly=message===channelFailure;
+     this.resetLobby();
+     this.update({message:relayOnly?'直连未完成，正在重新连接并尝试中继……':'正在重新核对邀约……'});
+     void allocate().catch(()=>this.fail(signalFailure));
+    };
     peer.on('open',()=>{
-     if(!this.active||generation!==this.peerGeneration)return;
-     if(host){clearTimeout(this.timer);this.update({stage:'waiting',code:room,message:''});}
-     else{this.update({message:'正在寻找密令对应的王庭……'});this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json'}));}
+     if(!current())return;
+     registered=true;
+     if(host){
+      if(!this.channel){clearTimeout(this.timer);this.update({stage:'waiting',code:room,message:''});}
+     }else{
+      if(!retried)this.update({message:'正在寻找密令对应的王庭……'});
+      this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json',metadata:{visit}}),retryJoin);
+     }
     });
     peer.on('connection',channel=>{
-     if(!this.active||generation!==this.peerGeneration){channel.close();return;}
+     if(!current()){channel.close();return;}
+     // A retry from the same tab may arrive before the old channel reports
+     // its closure. Never replace an established match or a different guest.
+     if(host&&this.channel&&!this.game&&typeof channel.metadata?.visit==='string'&&
+      channel.metadata.visit===this.channel.metadata?.visit){
+      this.detachChannel();this.resetLobby();
+      this.update({stage:'waiting',ready:false,otherReady:false,starting:false});
+     }
      if(!host||this.channel){
       const reject=()=>{channel.send({type:'reject',reason:'full'});setTimeout(()=>channel.close(),500);};
       if(channel.open)reject();else channel.once('open',reject);
@@ -116,68 +154,112 @@ export class CourtSession{
      this.attach(channel);
     });
     peer.on('error',error=>{
-     if(!this.active||generation!==this.peerGeneration)return;
-     if(host&&error.type==='unavailable-id'&&++attempts<12){
-      ++this.peerGeneration;peer.destroy();allocate();return;
+     if(!current())return;
+     if(host&&error.type==='unavailable-id'&&++collisions<12){
+      void allocate().catch(()=>this.fail(signalFailure));return;
      }
-     if(this.channel?.open&&['network','disconnected','server-error','socket-error','socket-closed','peer-unavailable'].includes(error.type))return;
-     if(host&&this.channel&&this.state.stage==='waiting'&&!this.match&&error.type==='webrtc')return;
-     this.fail(error.type==='peer-unavailable'?invalid:this.channel?channelFailure:signalFailure);
+     if(error.type==='peer-unavailable'){
+      if(!host&&!this.channel?.open)this.fail(invalid);
+      return;
+     }
+     const signaling=['network','disconnected','server-error','socket-error','socket-closed'].includes(error.type);
+     if(signaling&&(this.channel?.open||host&&registered))return;
+     if(error.type==='webrtc'){
+      // The connection's ICE listener and deadline are scoped to the attempted
+      // channel. PeerJS emits some late errors without a connection identifier.
+      return;
+     }
+     this.fail(this.channel?channelFailure:signalFailure);
     });
-    peer.on('disconnected',()=>{if(this.active&&!this.channel?.open)this.fail(signalFailure);});
+    peer.on('disconnected',()=>{
+     if(!current()||this.channel?.open)return;
+     if(host){
+      if(this.channel)this.returnToWaiting();
+      else this.resumeHost?.();
+     }else if(registered)retryJoin(signalFailure);
+     else this.fail(signalFailure);
+    });
    };
-   allocate();
+   await allocate();
   }catch{this.fail(failure);}
  }
- private attach(channel:DataConnection){
+ private detachChannel(){
+  const channel=this.channel;
+  this.channel=undefined;
+  clearTimeout(this.timer);clearInterval(this.heartbeat);
+  channel?.close();
+ }
+ private resetLobby(){
+  this.match='';this.offer='';this.remoteHashes={};this.hashes={};
+  this.secrets=[];this.roles.clear();
+  this.localReady=false;this.remoteReady=false;
+ }
+ private returnToWaiting(){
+  this.detachChannel();this.resetLobby();
+  this.update({stage:'waiting',ready:false,otherReady:false,starting:false,message:'对方未完成连接，仍可使用此密令。'});
+  this.resumeHost?.();
+ }
+ private attach(channel:DataConnection,retryJoin?:(message:string)=>void){
   this.channel=channel;this.lastSignal=Date.now();
-  const drop=()=>{
-   if(!this.active||this.channel!==channel)return;
-   if(this.state.side==='red'&&this.state.stage==='waiting'&&!this.match){
-    // An unreachable visitor must not invalidate an otherwise open invite.
-    this.channel=undefined;clearTimeout(this.timer);clearInterval(this.heartbeat);channel.close();
-    this.update({message:'上一次连接未能建立，密令仍可使用。'});
-   }else this.fail(this.match?absent:channelFailure);
+  const current=()=>this.active&&this.channel===channel;
+  let openedOnce=false;
+  const drop=(message=channelFailure)=>{
+   if(!current())return;
+   if(this.state.side==='red'&&!this.game){this.returnToWaiting();return;}
+   if(!this.game&&this.state.stage==='connecting'&&retryJoin){retryJoin(openedOnce&&message===channelFailure?failure:message);return;}
+   this.fail(this.match?absent:message);
   };
-  this.arm(channelFailure,12_000,drop);
+  this.arm(channelFailure,12_000,()=>drop());
   const pc=channel.peerConnection;
   const onIce=()=>{
-   if(!this.active||this.channel!==channel||channel.open)return;
+   if(!current()||channel.open)return;
    if(pc.iceConnectionState==='failed'){drop();return;}
    if(this.state.side==='blue'&&pc.remoteDescription)this.update({message:'已找到王庭，正在建立两台设备的连接……'});
   };
   pc?.addEventListener('iceconnectionstatechange',onIce);
   channel.once('close',()=>pc?.removeEventListener('iceconnectionstatechange',onIce));
-  let openedOnce=false;
   const opened=()=>{
-   if(!this.active||this.channel!==channel||openedOnce)return;
+   if(!current()||openedOnce)return;
    openedOnce=true;
-   this.arm(failure,7000);
+   this.arm(failure,7000,()=>drop(failure));
    if(this.state.side==='blue')this.update({message:'连接已建立，正在核对棋局规则……'});
+   let lastTick=Date.now();
    this.heartbeat=setInterval(()=>{
-    if(Date.now()-this.lastSignal>22_000){drop();return;}
+    const now=Date.now();
+    // Timer suspension on mobile can skip several checks. Probe the channel
+    // after waking before interpreting elapsed wall time as a dead peer.
+    if(now-lastTick>15_000)this.lastSignal=now;
+    lastTick=now;
+    if(now-this.lastSignal>22_000){drop();return;}
     try{this.send({type:'ping'});}catch{drop();}
    },6_000);
-   if(this.state.side==='blue')this.send({type:'hello',protocol,gameVersion,rule:this.rule});
+   if(this.state.side==='blue'){
+    try{this.send({type:'hello',protocol,gameVersion,rule:this.rule});}catch{drop();}
+   }
   };
   channel.on('open',opened);
-  channel.on('close',drop);
-  channel.on('error',drop);
+  channel.on('close',()=>drop());
+  channel.on('error',()=>drop());
   channel.on('data',data=>{
    this.mailbox=this.mailbox.then(async()=>{
-    if(!this.active||this.channel!==channel)return;
+    if(!current())return;
     if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('无效邀约消息');
     this.lastSignal=Date.now();
     await this.receive(data as Packet);
-   }).catch(e=>this.fail(this.game?`对局已暂停：${e instanceof Error?e.message:'同步中断'}`:failure));
+   }).catch(e=>{
+    if(!current())return;
+    if(this.state.side==='red'&&!this.game)this.returnToWaiting();
+    else this.fail(this.game?`对局已暂停：${e instanceof Error?e.message:'同步中断'}`:failure);
+   });
   });
   if(channel.open)opened();
  }
- private async initialize(){
-  const result=await deployment(this.match,this.state.side);
-  if(!this.active)return;
+ private async initialize(match=this.match){
+  const result=await deployment(match,this.state.side);
+  if(!this.active||(this.match!==match&&this.rematchId!==match))return false;
   this.secrets=result.openings;this.hashes=result.hashes;
   this.roles=new Map(this.secrets.map(p=>[p.id,p.role]));
+  return true;
  }
  private readyRoom(){
   clearTimeout(this.timer);
@@ -197,11 +279,12 @@ export class CourtSession{
   this.send({type:'start-offer',offer:this.offer});
  }
  private start(){
-  if(this.game)return;
-  clearTimeout(this.timer);
+  if(this.game&&!this.rematchId)return;
+  if(this.rematchId){this.match=this.rematchId;this.rematchId='';}
+  clearTimeout(this.timer);this.history.clear();this.wait=undefined;
   this.game=initialOnline(this.rule,this.state.side,this.roles);
   this.record(this.game);
-  this.update({stage:'playing',starting:false,message:'棋局启幕'});
+  this.update({stage:'playing',starting:false,message:'棋局启幕',rematchRequested:false,opponentRematch:false});
   this.onStart(this.game,this.state.side);
  }
  async play(action:GameAction){
@@ -260,10 +343,45 @@ export class CourtSession{
   this.record(next);this.update({pending:false});
   this.onTurn({before,next,action});
  }
+ requestRematch(){
+  if(!this.active||!this.game?.result||this.state.rematchRequested)return;
+  this.mailbox=this.mailbox.then(async()=>{
+   if(!this.active||!this.game?.result||this.state.rematchRequested)return;
+   this.update({rematchRequested:true});
+   this.send({type:'rematch',match:this.match});
+   await this.offerRematch();
+  }).catch(()=>this.fail(absent));
+ }
+ private async offerRematch(){
+  if(this.state.side!=='red'||this.rematchId||!this.state.rematchRequested||!this.state.opponentRematch)return;
+  this.rematchId=identifier();
+  this.arm(absent,9000);
+  if(await this.initialize(this.rematchId)){
+   this.send({type:'rematch-offer',previous:this.match,match:this.rematchId,hashes:this.hashes});
+  }
+ }
+ private async receiveRematch(m:Packet){
+  const side=this.state.side;
+  if(m.type==='rematch'&&m.match===this.match){
+   this.update({opponentRematch:true});await this.offerRematch();return;
+  }
+  if(m.type==='rematch-offer'&&side==='blue'&&m.previous===this.match&&
+   this.state.rematchRequested&&this.state.opponentRematch&&!this.rematchId&&
+   typeof m.match==='string'&&/^[\da-f-]{36}$/.test(m.match)&&m.match!==this.match&&isCommitments(m.hashes,'red')){
+   this.rematchId=m.match;this.remoteHashes=m.hashes;
+   this.arm(absent,9000);
+   if(await this.initialize(this.rematchId))this.send({type:'rematch-ack',match:this.rematchId,hashes:this.hashes});
+   return;
+  }
+  if(m.type==='rematch-ack'&&side==='red'&&this.rematchId&&m.match===this.rematchId&&isCommitments(m.hashes,'blue')){
+   this.remoteHashes=m.hashes;this.send({type:'rematch-begin',match:this.rematchId});this.start();return;
+  }
+  if(m.type==='rematch-begin'&&side==='blue'&&this.rematchId&&m.match===this.rematchId)this.start();
+ }
  private async receive(m:Packet){
   if(m.type==='ping'){this.send({type:'pong'});return;}
   if(m.type==='pong')return;
-  if(m.type==='bye'){this.fail(absent);return;}
+  if(m.type==='bye'){if(this.state.side==='red'&&!this.game)this.returnToWaiting();else this.fail(absent);return;}
   if(m.type==='reject'){this.fail(m.reason==='full'?full:m.reason==='rule'?'双方所选规则不同。请返回选择相同规则。':'游戏版本不一致，请刷新后重试。');return;}
   const side=this.state.side,enemy=other(side);
   if(m.type==='hello'&&side==='red'&&!this.match){
@@ -272,17 +390,20 @@ export class CourtSession{
     clearTimeout(this.timer);clearInterval(this.heartbeat);
     setTimeout(()=>rejected?.close(),500);
     return;}
-   this.match=identifier();await this.initialize();if(!this.active)return;
+   this.match=identifier();if(!await this.initialize())return;
    this.send({type:'welcome',match:this.match,protocol,gameVersion,rule:this.rule,hashes:this.hashes});
    return;
   }
   if(m.type==='welcome'&&side==='blue'&&!this.match){
    if(typeof m.match!=='string'||!/^[\da-f-]{36}$/.test(m.match)||m.protocol!==protocol||m.gameVersion!==gameVersion||m.rule!==this.rule||!isCommitments(m.hashes,enemy))throw new Error('邀约协议不符');
-   this.match=m.match;this.remoteHashes=m.hashes;await this.initialize();if(!this.active)return;
-   this.send({type:'enroll',match:this.match,hashes:this.hashes});this.readyRoom();return;
+   this.match=m.match;this.remoteHashes=m.hashes;if(!await this.initialize())return;
+   this.send({type:'enroll',match:this.match,hashes:this.hashes});return;
   }
   if(m.type==='enroll'&&side==='red'&&this.state.stage==='waiting'&&m.match===this.match&&isCommitments(m.hashes,enemy)){
-   this.remoteHashes=m.hashes;this.readyRoom();return;
+   this.remoteHashes=m.hashes;this.send({type:'enrolled',match:this.match});this.readyRoom();return;
+  }
+  if(m.type==='enrolled'&&side==='blue'&&this.state.stage==='connecting'&&this.match&&m.match===this.match){
+   this.readyRoom();return;
   }
   if(this.state.stage==='ready'){
    if(m.type==='ready'&&typeof m.value==='boolean'){
@@ -303,6 +424,7 @@ export class CourtSession{
   }
   const game=this.game;
   if(!game)throw new Error('棋局尚未开始');
+  if(game.result&&typeof m.type==='string'&&m.type.startsWith('rematch')){await this.receiveRematch(m);return;}
   if(m.type==='resign'){
    if(game.result)return;
    if(m.match!==this.match||m.ply!==game.ply||m.side!==enemy||game.turn!==enemy||this.wait)throw new Error('弃局时回合不同步');
