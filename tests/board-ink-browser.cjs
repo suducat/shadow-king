@@ -14,15 +14,20 @@ const {openGame,launch,holdFrame}=require('./support.cjs');
    const portrait=page.locator('.home-portrait');
    assert.equal(await portrait.getAttribute('data-role'),'king');
    assert.equal(await portrait.locator('.home-floor polygon').count(),49);
+   const hero=page.locator('.court-hero-art');
+   assert.equal(await hero.innerText(),'');
+   assert.equal(await hero.locator('button').count(),0);
    if(!mobile){
     await page.screenshot({path:'artifacts/home-court-desktop.png'});
-    await page.locator('.home-portrait[data-role="guard"]').waitFor({timeout:9500});
-   }else await page.screenshot({path:'artifacts/home-court-mobile.png'});
-   await page.getByRole('button',{name:'影卫',exact:true}).click();
-   assert.equal(await portrait.getAttribute('data-role'),'guard');
-   assert.equal(await portrait.locator('.home-sword-light').count(),1);
-   await page.getByRole('button',{name:'死士',exact:true}).click();
-   assert.equal(await portrait.getAttribute('data-role'),'martyr');
+    await page.locator('.home-portrait[data-role="guard"]').waitFor({timeout:10000});
+    assert.equal(await portrait.locator('.home-sword-light').count(),1);
+    await page.locator('.home-portrait[data-role="martyr"]').waitFor({timeout:10000});
+    await page.locator('.home-portrait[data-role="king"]').waitFor({timeout:10000});
+   }else{
+    await page.screenshot({path:'artifacts/home-court-mobile.png'});
+    assert.equal(await portrait.getAttribute('data-role'),'king');
+    assert.equal(await portrait.locator('.entrance-actor').evaluate(actor=>getComputedStyle(actor).animationName),'none');
+   }
    await page.getByRole('button',{name:/开启棋局/}).click();
    await page.locator('.rule-entrance').waitFor();
    assert.equal(await portrait.count(),0);

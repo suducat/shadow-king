@@ -86,17 +86,14 @@ function Floor(){
 
 export function HomeCourt({reduced}:{reduced:boolean}){
  const [active,setActive]=useState(0);
- const [paused,setPaused]=useState(false);
- const [focused,setFocused]=useState(false);
  const {role,name,color,draw:Portrait}=chapters[active];
  const light=useId();
  useEffect(()=>{
-  if(reduced||paused||focused)return;
+  if(reduced)return;
   const timer=setTimeout(()=>setActive(value=>(value+1)%chapters.length),6500);
   return ()=>clearTimeout(timer);
- },[active,reduced,paused,focused]);
- return <section className="court-hero-art" aria-label="永夜王庭角色演出"
-   onFocus={()=>setFocused(true)} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFocused(false);}}>
+ },[active,reduced]);
+ return <section className="court-hero-art" aria-label="永夜王庭角色演出">
   <svg key={role} className="home-portrait" data-role={role} style={{color}} viewBox="0 0 440 345" role="img" aria-label={name}>
    <defs><radialGradient id={light}><stop stopColor="currentColor" stopOpacity=".28"/><stop offset="1" stopColor="currentColor" stopOpacity="0"/></radialGradient></defs>
    <ellipse className="entrance-light" cx="220" cy="151" rx="192" ry="157" fill={`url(#${light})`}/>
@@ -106,9 +103,5 @@ export function HomeCourt({reduced}:{reduced:boolean}){
    <ellipse cx="220" cy="292" rx="129" ry="15" fill="#0b111a" opacity=".75"/>
    <g className="entrance-actor"><Portrait/></g>
   </svg>
-  <div className="home-portrait-controls">
-   {chapters.map(({role,name},index)=><button type="button" key={role} aria-pressed={active===index} onClick={()=>setActive(index)}>{name}</button>)}
-   {!reduced&&<button type="button" className="home-pause" aria-label="暂停轮播" aria-pressed={paused} onClick={()=>setPaused(value=>!value)}>{paused?'继续':'暂停'}</button>}
-  </div>
  </section>;
 }

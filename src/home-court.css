@@ -32,26 +32,6 @@
 }
 [data-role="guard"] .home-prop { animation: entrance-draw var(--entrance-length) cubic-bezier(.2,.72,.28,1) both; }
 .home-sword-light { animation: home-gather 1050ms 220ms both; }
-.home-portrait-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-}
-.home-portrait-controls button {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 .65rem;
-  border-bottom: 1px solid #77664f;
-  color: #c1b497;
-}
-.home-portrait-controls button[aria-pressed="true"] {
-  background: #d4b47a17;
-  border-color: #edcc84;
-  color: #f5e1b3;
-}
-.home-pause { margin-left: .45rem; }
 @keyframes home-unveil { from { opacity: .1; transform: translateY(8px); } }
 @keyframes home-gather { 0% { opacity: 0; } 58% { opacity: 1; } 100% { opacity: .6; } }
 @media (max-width: 800px) {
