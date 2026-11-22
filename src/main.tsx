@@ -7,4 +7,5 @@ import './render.css';
 import './combat-polish.css';
 import './match-polish.css';
 import './court-summons.css';
+import './court-stage.css';
 createRoot(document.getElementById('root')!).render(<App/>);

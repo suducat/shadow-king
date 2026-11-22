@@ -7,7 +7,7 @@ import {
  resolveOnline,settleRepetition,verifyOpenings,type Commitments,type Opening,
 } from './online-rules';
 
-const protocol=2,gameVersion='0.8.1';
+const protocol=3,gameVersion='0.8.1';
 const namespace='shadow-king-summons-v1-';
 const failure='邀约未能建立，请重试。';
 const signalFailure='暂时无法连接邀约服务，请检查网络后重试。';
@@ -17,7 +17,7 @@ const full='此局已有执棋者。';
 const absent='对方暂离王庭';
 const identifier=()=>crypto.randomUUID();
 const code=()=>String(crypto.getRandomValues(new Uint32Array(1))[0]%1_000_000).padStart(6,'0');
-type State={stage:'opening'|'waiting'|'connecting'|'ready'|'playing'|'error';code:string;side:Side;ready:boolean;otherReady:boolean;starting:boolean;message:string;pending:boolean;rematchRequested:boolean;opponentRematch:boolean};
+type State={stage:'opening'|'waiting'|'connecting'|'ready'|'deploying'|'playing'|'error';code:string;side:Side;ready:boolean;otherReady:boolean;starting:boolean;message:string;pending:boolean;rematchRequested:boolean;opponentRematch:boolean;deploymentUntil?:number;deploymentLocked?:boolean;};
 type Packet=Record<string,unknown>;
 type Turn={match:string;ply:number;op:string;side:Side;action:GameAction};
 type Pending={turn:Turn;next?:Game;matches?:number[]};
@@ -54,6 +54,8 @@ export class CourtSession{
  private hashes:Commitments={};
  private remoteHashes:Commitments={};
  private game?:Game;
+ private localDeployed=false;
+ private remoteDeployed=false;
  private wait?:Pending;
  private history=new Map<number,{publicKey:string;ownKey:string}>();
  private localReady=false;
@@ -61,7 +63,7 @@ export class CourtSession{
  state:State;
 
  constructor(private rule:GameMode,side:Side,secret:string,private publish:(s:State)=>void,
-  private onStart:(g:Game,side:Side)=>void,private onTurn:(turn:TurnDisplay)=>void){
+  private onStart:(g:Game,side:Side,deploying?:boolean)=>void,private onTurn:(turn:TurnDisplay)=>void){
   this.state={stage:side==='red'?'opening':'connecting',code:secret,side,ready:false,otherReady:false,starting:false,message:'',pending:false,rematchRequested:false,opponentRematch:false};
  }
  private update(next:Partial<State>){this.state={...this.state,...next};if(!this.closed)this.publish(this.state);}
@@ -278,9 +280,35 @@ export class CourtSession{
   this.arm();
   this.send({type:'start-offer',offer:this.offer});
  }
- private start(){
-  if(this.game&&!this.rematchId)return;
+ private deployBoard(){
+  if(this.state.stage==='deploying')return;
   if(this.rematchId){this.match=this.rematchId;this.rematchId='';}
+  this.game=undefined;this.localDeployed=this.remoteDeployed=false;
+  this.arm(absent,48_000);
+  this.update({stage:'deploying',deploymentUntil:Date.now()+30_000,deploymentLocked:false,
+   starting:false,rematchRequested:false,opponentRematch:false,message:'秘密布阵'});
+  this.onStart(initialOnline(this.rule,this.state.side,this.roles),this.state.side,true);
+ }
+ lockDeployment(draft:Game){
+  if(!this.active||this.state.stage!=='deploying'||this.state.deploymentLocked)return;
+  this.update({deploymentLocked:true});
+  this.mailbox=this.mailbox.then(async()=>{
+   const match=this.match;
+   const result=await deployment(match,this.state.side,draft);
+   if(!this.active||this.state.stage!=='deploying'||match!==this.match)return;
+   this.secrets=result.openings;this.hashes=result.hashes;
+   this.roles=new Map(this.secrets.map(p=>[p.id,p.role]));
+   this.localDeployed=true;
+   this.send({type:'deployment-lock',match,hashes:this.hashes});
+   this.checkDeployment();
+  }).catch(()=>this.fail('未能确认布阵。'));
+ }
+ private checkDeployment(){
+  if(this.state.side!=='red'||!this.localDeployed||!this.remoteDeployed)return;
+  this.send({type:'deployment-start',match:this.match});this.start();
+ }
+ private start(){
+  if(this.state.stage!=='deploying')return;
   clearTimeout(this.timer);this.history.clear();this.wait=undefined;
   this.game=initialOnline(this.rule,this.state.side,this.roles);
   this.record(this.game);
@@ -374,9 +402,9 @@ export class CourtSession{
    return;
   }
   if(m.type==='rematch-ack'&&side==='red'&&this.rematchId&&m.match===this.rematchId&&isCommitments(m.hashes,'blue')){
-   this.remoteHashes=m.hashes;this.send({type:'rematch-begin',match:this.rematchId});this.start();return;
+   this.remoteHashes=m.hashes;this.send({type:'rematch-begin',match:this.rematchId});this.deployBoard();return;
   }
-  if(m.type==='rematch-begin'&&side==='blue'&&this.rematchId&&m.match===this.rematchId)this.start();
+  if(m.type==='rematch-begin'&&side==='blue'&&this.rematchId&&m.match===this.rematchId)this.deployBoard();
  }
  private async receive(m:Packet){
   if(m.type==='ping'){this.send({type:'pong'});return;}
@@ -418,9 +446,17 @@ export class CourtSession{
     this.offer='';clearTimeout(this.timer);this.update({starting:false});this.propose();return;
    }
    if(m.type==='start-ack'&&side==='red'&&this.offer&&m.offer===this.offer){
-    this.send({type:'begin',offer:this.offer});this.start();return;
+    this.send({type:'begin',offer:this.offer});this.deployBoard();return;
    }
-   if(m.type==='begin'&&side==='blue'&&this.offer&&m.offer===this.offer){this.start();return;}
+   if(m.type==='begin'&&side==='blue'&&this.offer&&m.offer===this.offer){this.deployBoard();return;}
+  }
+  if(this.state.stage==='deploying'){
+   if(m.match!==this.match)return;
+   if(m.type==='deployment-lock'&&!this.remoteDeployed&&isCommitments(m.hashes,enemy)){
+    this.remoteHashes=m.hashes;this.remoteDeployed=true;this.checkDeployment();return;
+   }
+   if(m.type==='deployment-start'&&side==='blue'&&this.localDeployed&&this.remoteDeployed){this.start();return;}
+   return;
   }
   const game=this.game;
   if(!game)throw new Error('棋局尚未开始');

@@ -13,9 +13,15 @@ export async function commitment(match:string,proof:Opening){
  const encoded=new TextEncoder().encode(JSON.stringify([match,proof.id,proof.role,proof.salt]));
  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256',encoded)));
 }
-export async function deployment(match:string,side:Side){
+export async function deployment(match:string,side:Side,draft?:Game){
  const roles:Role[]=['king','guard','guard','guard','martyr','martyr','martyr'];
- for(let i=roles.length-1;i>0;i--){
+ if(draft){
+  const line=draft.pieces.filter(p=>p.side===side).sort((a,b)=>a.x-b.x);
+  if(line.length!==7||line.some((p,i)=>p.x!==i||p.y!==(side==='red'?6:0))||
+    ranks.some(role=>line.filter(p=>p.role===role).length!==inventory()[role]))throw new Error('布阵无效');
+  roles.splice(0,7,...line.map(p=>p.role));
+ }
+ for(let i=draft?0:roles.length-1;i>0;i--){
   const j=Math.floor(crypto.getRandomValues(new Uint32Array(1))[0]/2**32*(i+1));
   [roles[i],roles[j]]=[roles[j],roles[i]];
  }

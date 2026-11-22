@@ -69,3 +69,16 @@ test('threefold draw requires both sides to match the same prior turns',()=>{
  assert.equal(settleRepetition(game,[0,4],[4,8]).result,null);
  assert.deepEqual(settleRepetition(game,[0,4],[0,4,8]).result,{winner:null,reason:'repetition'});
 });
+
+test('online formation commits the local draft by board column, without transmitting its order',async()=>{
+ const g=createGame('ritual');
+ const king=g.pieces.find(p=>p.side==='blue'&&p.role==='king')!;
+ const guard=g.pieces.find(p=>p.side==='blue'&&p.role==='guard')!;
+ [king.x,guard.x]=[guard.x,king.x];
+ const committed=await deployment('formation','blue',g);
+ assert.equal(committed.openings.find(p=>p.id===`blue-${king.x}`)?.role,'king');
+ assert.equal(committed.openings.find(p=>p.id===`blue-${guard.x}`)?.role,'guard');
+ assert.ok(Object.values(committed.hashes).every(v=>/^[a-f0-9]{64}$/.test(v)));
+ king.x=guard.x;
+ await assert.rejects(deployment('formation','blue',g),/布阵无效/);
+});

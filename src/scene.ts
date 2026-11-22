@@ -95,9 +95,12 @@ export class BoardScene {
   lastAttack: {role:VisibleRole; victimId?:string; dissolved:boolean;execution?:boolean;path?:ActionStep[]} | null = null;
   private dirty = true; private lastRender=0;
   private dead = false;
+  private layoutSuspended=false;
   private measuredWidth = 0; private measuredHeight = 0;
   private last = performance.now();
   private lastCamera = performance.now();
+  private touches=new Map<number,T.Vector2>();
+  private pinch?:{span:number;zoom:number};
   private cameraFitKey = "";
   private cameraFitDistance = 0;
   private lastMotionShadow=-Infinity;
@@ -482,7 +485,12 @@ export class BoardScene {
   }
   effect(x:number,y:number,role:VisibleRole){this.fx.impact(x,y,role,new T.Vector3(0,0,-1),this.state.reduced);this.dirty=true;}
   rotate() { this.desiredAngle += Math.PI / 2; }
-  setZoom(value: number) { this.desiredZoom = value; }
+  setZoom(value:number) { this.desiredZoom=T.MathUtils.clamp(value,.75,1.5); }
+  adjustZoom(delta:number) { this.setZoom(this.desiredZoom+delta); }
+  private touchSpan(){
+    const [first,second]=this.touches.values();
+    return first&&second?first.distanceTo(second):0;
+  }
   resetCamera() { this.desiredAngle = this.state.viewer === 'blue' ? Math.PI + .55 : .55; this.desiredZoom = 1; }
   syncLayout() { this.resize(); }
   layoutReady() {
@@ -491,27 +499,52 @@ export class BoardScene {
   }
   private resize() {
     const rect=this.host.getBoundingClientRect(),w=rect.width,h=rect.height;
-    if(w<=0||h<=0)return;
-    const {ratio}=renderResolution(w,h,devicePixelRatio,this.quality);this.displayDensity=devicePixelRatio;
+    this.displayDensity=devicePixelRatio;
+    this.layoutSuspended=w<=0||h<=0;
+    if(this.layoutSuspended)return;
+    const {ratio}=renderResolution(w,h,devicePixelRatio,this.quality);
     if(Math.abs(w-this.measuredWidth)<.01&&Math.abs(h-this.measuredHeight)<.01&&Math.abs(ratio-this.measuredDensity)<.0001)return;
     this.measuredWidth=w;this.measuredHeight=h;this.measuredDensity=ratio;this.displayDensity=devicePixelRatio;this.dirty=true;this.renderer.domElement.dataset.ready='false';
     this.renderer.setDrawingBufferSize(w,h,ratio);this.bufferResizes++;
     this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
   }
   private pointerDown = (e: PointerEvent) => {
+    if(e.pointerType==='touch'){
+      this.touches.set(e.pointerId,new T.Vector2(e.clientX,e.clientY));
+      this.renderer.domElement.setPointerCapture(e.pointerId);
+      const span=this.touchSpan();
+      if(this.touches.size>1){
+        this.down=null;
+        if(!this.pinch&&span>0)this.pinch={span,zoom:this.desiredZoom};
+        return;
+      }
+    }
     if (!e.isPrimary || (e.button !== 0 && e.button !== 2)) return;
     this.down = { x: e.clientX, y: e.clientY, id: e.pointerId, button: e.button };
     this.dragging = e.button === 2;
     this.renderer.domElement.setPointerCapture(e.pointerId);
   };
   private pointerMove = (e: PointerEvent) => {
+    const point=this.touches.get(e.pointerId);
+    if(point){
+      point.set(e.clientX,e.clientY);
+      const span=this.touchSpan();
+      if(this.pinch&&span>0){this.setZoom(this.pinch.zoom*span/this.pinch.span);return;}
+    }
     if (this.down?.id !== e.pointerId) return;
     if (this.dragging) { this.desiredAngle += (e.clientX - this.down.x) * .008; this.down.x = e.clientX; }
   };
-  private pointerCancel = () => { this.down = null; this.dragging = false; };
+  private pointerCancel = (e:PointerEvent) => {
+    this.touches.delete(e.pointerId);
+    if(this.touches.size<2)this.pinch=undefined;
+    if(this.down?.id===e.pointerId){this.down=null;this.dragging=false;}
+  };
   private pointerUp = (e: PointerEvent) => {
-    const down = this.down; this.down = null;
-    if (!down || down.id !== e.pointerId) return;
+    this.touches.delete(e.pointerId);
+    if(this.touches.size<2)this.pinch=undefined;
+    const down=this.down;
+    if(!down||down.id!==e.pointerId)return;
+    this.down=null;
     if (this.renderer.domElement.hasPointerCapture(e.pointerId)) this.renderer.domElement.releasePointerCapture(e.pointerId);
     if (this.dragging || down.button !== 0) { this.dragging = false; return; }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return;
@@ -541,6 +574,7 @@ export class BoardScene {
     this.frame = requestAnimationFrame(this.animate);
     this.applyQuality();
     if(devicePixelRatio!==this.displayDensity)this.resize();
+    if(this.layoutSuspended)return;
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, .05); this.last = now;
     // Full privacy/result covers have no interactive 3D content. Stop their
     // hidden GPU work so DOM/SVG ending animation can use the compositor freely.
@@ -550,23 +584,37 @@ export class BoardScene {
     // Camera fit only changes during orbit, zoom, or a layout change.
     if(Math.abs(this.angle-this.desiredAngle)<.0008)this.angle=this.desiredAngle;
     if(Math.abs(this.zoom-this.desiredZoom)<.001)this.zoom=this.desiredZoom;
-    const fitKey=[this.angle,this.zoom,this.camera.aspect,this.state.active].join('/');
-    const aspect = this.camera.aspect, fit = aspect < .85 ? 1.28 : aspect < 1.1 ? 1.12 : 1;
-    let distance=fitKey===this.cameraFitKey?this.cameraFitDistance:(this.state.active?14.7:10.8)*fit/this.zoom;
-
-
-    this.camera.position.set(Math.sin(this.angle) * distance * .78, distance * .83, Math.cos(this.angle) * distance * .78); this.camera.lookAt(0, -.05, 0);
-    if(this.state.active&&fitKey!==this.cameraFitKey){
-      for(let iteration=0;iteration<3;iteration++){
-        this.camera.updateMatrixWorld(true);let overflow=1;
-        for(const x of [-3.6,3.6])for(const z of [-3.6,3.6])for(const y of [.05,1.85]){
-          const p=new T.Vector3(x,y,z).project(this.camera);overflow=Math.max(overflow,Math.abs(p.x)/.94,Math.abs(p.y)/.82);
+    const aspect=this.camera.aspect,fitKey=`${aspect}/${this.state.active}`;
+    if(fitKey!==this.cameraFitKey){
+      const fit=aspect<.85?1.28:aspect<1.1?1.12:1;
+      const base=(this.state.active?14.7:10.8)*fit;
+      let required=base;
+      if(this.state.active){
+        // Square-board symmetry lets us fit the entire orbit in a quarter turn.
+        // Applying zoom after this calculation keeps the orbit radius constant.
+        const corner=new T.Vector3();
+        for(let n=0;n<=8;n++){
+          const angle=n*Math.PI/32;
+          let radius=base;
+          for(let i=0;i<3;i++){
+            this.camera.position.set(Math.sin(angle)*radius*.78,radius*.83,Math.cos(angle)*radius*.78);
+            this.camera.lookAt(0,-.05,0);this.camera.updateMatrixWorld(true);
+            let overflow=1;
+            for(const x of [-3.6,3.6])for(const z of [-3.6,3.6])for(const y of [.05,1.85]){
+              corner.set(x,y,z).project(this.camera);
+              overflow=Math.max(overflow,Math.abs(corner.x)/.94,Math.abs(corner.y)/.82);
+            }
+            if(overflow<=1.002)break;
+            radius*=overflow*1.01;
+          }
+          required=Math.max(required,radius);
         }
-        if(overflow<=1.002)break;distance*=overflow*1.01;
-        this.camera.position.set(Math.sin(this.angle)*distance*.78,distance*.83,Math.cos(this.angle)*distance*.78);this.camera.lookAt(0,-.05,0);
       }
+      this.cameraFitKey=fitKey;this.cameraFitDistance=required;
     }
-    this.cameraFitKey=fitKey;this.cameraFitDistance=distance;
+    const distance=this.cameraFitDistance/this.zoom;
+    this.camera.position.set(Math.sin(this.angle)*distance*.78,distance*.83,Math.cos(this.angle)*distance*.78);
+    this.camera.lookAt(0,-.05,0);
     this.cameraBase.copy(this.camera.position);
 
     for (const [id, actor] of this.actors) {
