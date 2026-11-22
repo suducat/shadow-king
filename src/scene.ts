@@ -5,6 +5,7 @@ import {RigidBatches} from './rigid-batches';
 import {renderResolution} from './render-resolution';
 import {surface,disposeSurfaces,setSurfaceSampling} from './surfaces';
 import {BattleEffects} from './battle-effects';
+import {BoardInk} from './board-ink';
 import {battleTimeline,consumeCues,sampleBattle,drawStance,drawStart,drawSpan,retirementPose,disclosureDelay,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
 import type {CueOptions} from './audio';
 import type { Side, VisiblePiece, VisibleRole,Capture } from './game';
@@ -75,6 +76,7 @@ export class BoardScene {
   frame = 0;
   renderedFrames = 0;
   fx:BattleEffects;
+  private ink:BoardInk;
   onBoardContact:((actor:string,step:ActionStep,rites:Rites|undefined,reveals:PublicBeats['reveals'])=>void)|null=null;
   onBattleCue:((kind:string,options?:CueOptions)=>void)|null=null;
   onBattleCancel:((group:string)=>void)|null=null;onPublicCapture:((capture:Capture)=>void)|null=null;
@@ -115,6 +117,7 @@ export class BoardScene {
     this.renderer.domElement.setAttribute('aria-label', '可交互的三维魔法棋盘，点击己方棋子，再点击亮起的合法格子');
     this.renderer.domElement.setAttribute('role', 'img');
     host.appendChild(this.renderer.domElement);
+    this.ink=new BoardInk(host);
     this.executionShade.className='execution-shade';
     this.executionShade.setAttribute('aria-hidden','true');
     document.body.appendChild(this.executionShade);
@@ -232,7 +235,9 @@ export class BoardScene {
       if(next.viewer!==this.state.viewer||!next.active||next.deployment||!incoming||incoming.role!==tr.actor.role||incoming.x!==tr.to.x+3||incoming.y!==tr.to.z+3||next.pieces.some(p=>tr.victims.some(v=>v.id===p.id)))this.cancelMove();
     }
     const previousViewer = this.state.viewer;
-    if(next.viewer!==previousViewer||next.active!==this.state.active)this.fx.clearTransient();
+    if(next.viewer!==previousViewer||next.active!==this.state.active||next.reduced!==this.state.reduced){
+      this.fx.clearTransient();this.ink.clear();
+    }
     if(next.viewer!==previousViewer&&this.burst){this.root.remove(this.burst.group);this.disposeGroup(this.burst.group);this.burst=null;}
     this.state = next;
     if (next.viewer && next.viewer !== previousViewer) this.desiredAngle = next.viewer === 'blue' ? Math.PI + .55 : .55;
@@ -362,7 +367,10 @@ export class BoardScene {
     const tr=this.transition;const pieces=state.pieces.map(p=>tr?.publicBeats.reveals.some(r=>r.id===p.id&&!tr.impacts.has(r.step))?tr.beforePieces.find(b=>b.id===p.id)??p:p);
     for(const v of tr?.victims??[])if(!tr!.impacts.has(v.index)){const p=tr!.beforePieces.find(p=>p.id===v.id);if(p&&!pieces.some(b=>b.id===p.id))pieces.push(p);}
     const cues=this.fx.update(state.mode,rites,pieces,state.preview,state.pendingCharge,state.pieces.find(p=>p.id===state.selected),now,state.reduced);
-    for(const kind of cues??[])this.audioQueue.push({kind,options:{group:'ceremony',key:`${this.instance}/rite/${++this.ceremonySerial}`,reduced:state.reduced},at:now});
+    for(const kind of cues??[]){
+      this.audioQueue.push({kind,options:{group:'ceremony',key:`${this.instance}/rite/${++this.ceremonySerial}`,reduced:state.reduced},at:now});
+      if(kind==='rite-open'&&!this.transition?.silent&&!document.hidden)this.ink.add('rite',now,cellToWorld(3,3,.25),{reduced:state.reduced});
+    }
   }
   animateMove(id:string,role:VisibleRole,to:{x:number;y:number},victimId?:string,reduced=false):Promise<boolean>{return this.animatePath(id,role,[{...to,...(victimId?{victimId}:{})}],reduced,false);}
   animatePath(id:string,role:VisibleRole,steps:ActionStep[],reduced=false,execution=false,options:{charge?:boolean;publicBeats?:PublicBeats}={}):Promise<boolean>{
@@ -379,7 +387,9 @@ export class BoardScene {
     return new Promise(finish=>{this.transition={id,role,actor,victim:victims[0]?.actor,victimId,victims,steps:steps.map(p=>({...p})),execution,cues:line.cues,emitted:new Set(),silent:false,impacts:new Set(),restore:actor.rest,from,to:destination,start:performance.now(),duration:line.duration,impact:false,finish,line,publicBeats:options.publicBeats??{captures:[],reveals:[]},beforeRites:this.state.ritual?structuredClone(this.state.ritual):undefined,beforePieces:structuredClone(this.state.pieces),ceremonyCommitted:false,lastProgress:0,startLift:actor.model.position.y,fromFacing:actor.facing,goalFacing,groupKey:`battle/${this.instance}/${++this.actionSerial}`};});
   }
   cancelMove(completed=false){
-    const tr=this.transition;this.transition=null;if(!tr)return;
+    const tr=this.transition;this.transition=null;
+    if(!completed)this.ink.clear();
+    if(!tr)return;
     this.executionShade.style.opacity='0';this.executionLamp.intensity=0;
     this.boardMarks.clearLanding();tr.restore();if(this.actors.get(tr.id)===tr.actor){tr.actor.group.position.copy(tr.to);tr.actor.facing=tr.goalFacing;if(tr.actor.rig){const pose=neutralPose();if(tr.actor.role==='guard'&&this.state.pieces.find(p=>p.id===tr.id)?.charging){drawStance(pose);}poseFigure(tr.actor.rig,pose,tr.actor.facing);}}
     for(const v of tr.victims){
@@ -426,6 +436,17 @@ export class BoardScene {
       const at=tr.start+cue.at*tr.duration,age=now-at,fresh=age<160&&!document.hidden&&!tr.silent;
       if(import.meta.env.MODE==='test')this.cueLog.push({id:tr.id,kind:cue.kind,index:cue.index});
       let material:VisibleRole='unknown';
+      if(fresh&&cue.kind==='slide'){
+        this.ink.add('slide',at,actor.group.position,{direction:dir,reduced:tr.line.reduced,
+          follow:()=>actor.group.position.clone().add(new T.Vector3(0,.27,0)).addScaledVector(dir,-.28)});
+      }
+      if(fresh&&cue.kind==='dash'&&tr.role!=='unknown'){
+        const bladeHeight=new T.Vector3(0,.85,0);
+        this.ink.add('dash',at,tr.from.clone().add(bladeHeight),{end:tr.to.clone().add(bladeHeight),reduced:tr.line.reduced,color:'#f4fbff'});
+      }
+      if(fresh&&cue.kind==='charged'&&tr.role==='guard'){
+        this.ink.add('charge',at,tip,{reduced:tr.line.reduced,follow:()=>actor.rig!.weapon.localToWorld(new T.Vector3(0,.32,0))});
+      }
       if(cue.kind==='disclose'){
         const beat=tr.publicBeats.captures.find(c=>c.step===cue.index);
         const victim=tr.victims.find(v=>v.index===cue.index);
@@ -439,6 +460,7 @@ export class BoardScene {
             victim.actor.model.visible=false;
           }
           if(fresh&&!tr.execution&&!tr.line.reduced)this.fx.ash(victim.at,dir,at);
+          if(fresh)this.ink.add('soul',at,victim.at.clone().add(new T.Vector3(0,.72,0)),{reduced:tr.line.reduced});
           if(!tr.silent)this.onPublicCapture?.(beat.capture);
         }
         continue;
@@ -457,7 +479,10 @@ export class BoardScene {
         if(tr.pendingState)this.syncEffects(tr.pendingState,rites,now);
         if(!tr.silent)this.onBoardContact?.(tr.id,hit,rites,reveals);
         material=victim.actor.role;
-        if(fresh){this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,tr.execution);
+        if(fresh){
+          const contact=victim.at.clone().add(new T.Vector3(0,.55,0));
+          this.ink.add(tr.execution?'shatter':'impact',at,contact,{reduced:tr.line.reduced});
+          this.fx.impact(hit.x,hit.y,tr.role,dir,tr.line.reduced,at,tr.execution);
         if(tr.role==='king'&&!tr.line.reduced)this.fx.crownStrike(actor.group.position,at);if(!tr.line.reduced&&this.state.cinematic&&(tr.execution||tr.publicBeats.decisive===i))this.cameraImpulse={at,direction:dir.clone()};}
       }
       if(cue.kind==='recover'&&tr.pendingState&&!tr.ceremonyCommitted){tr.ceremonyCommitted=true;this.syncEffects(tr.pendingState,tr.pendingState.ritual,now);}
@@ -651,6 +676,7 @@ export class BoardScene {
       if(point){this.executionShade.style.setProperty('--focus-x',point.x+'px');this.executionShade.style.setProperty('--focus-y',point.y+'px');}
     }
     if(!cut?.execution&&this.cameraImpulse&&this.state.cinematic&&!this.state.reduced){const t=(actionTime-this.cameraImpulse.at)/180;if(t>=1)this.cameraImpulse=null;else{this.camera.position.addScaledVector(this.cameraImpulse.direction,-.018*Math.sin(t*Math.PI)*(1-t));this.camera.lookAt(0,-.05,0);}}
+    this.ink.tick(actionTime,this.camera,this.measuredWidth,this.measuredHeight);
     this.fx.tick(actionTime,this.state.reduced,this.actors);
     if (this.burst) {
       const age = (now - this.burst.start) / 1000;
@@ -671,7 +697,7 @@ export class BoardScene {
       const cues=this.audioQueue.splice(0);if(!document.hidden)for(const cue of cues)if(actionTime-cue.at<180)this.onBattleCue?.(cue.kind,cue.options);
     }
   };
-  skipMove(){if(!this.transition)return;this.lastSkipped=true;this.transition.silent=true;this.stepMove(this.transition.start+this.transition.duration+1);this.fx.clearTransient();this.audioQueue=[];this.clearCameraImpulse();}
+  skipMove(){if(!this.transition)return;this.lastSkipped=true;this.transition.silent=true;this.stepMove(this.transition.start+this.transition.duration+1);this.fx.clearTransient();this.ink.clear();this.audioQueue=[];this.clearCameraImpulse();}
   private removeActor(id:string,actor:Actor){
     // A stale animation may only release the exact instance it owns. Never an
     // actor with the same ID from a new perspective or a restarted match.
@@ -681,7 +707,7 @@ export class BoardScene {
     g.traverse(o => { if (o instanceof T.Mesh || o instanceof T.Line) { if(o instanceof T.InstancedMesh)o.dispose();if(!o.geometry?.userData.shared)o.geometry?.dispose(); const materials = Array.isArray(o.material) ? o.material : [o.material]; for (const m of materials) if (!m.userData.shared && m !== metal && m !== darkMetal && m !== obsidian) { for(const value of Object.values(m))if(value instanceof T.Texture&&!value.userData.shared)value.dispose(); m.dispose(); } } });
   }
   destroy() {
-    this.cancelMove(); this.dead = true; cancelAnimationFrame(this.frame); this.observer.disconnect();
+    this.cancelMove(); this.dead = true; cancelAnimationFrame(this.frame); this.observer.disconnect(); this.ink.destroy();
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown); this.renderer.domElement.removeEventListener('pointerup', this.pointerUp); this.renderer.domElement.removeEventListener('pointermove', this.pointerMove); this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.removeEventListener('lostpointercapture', this.pointerCancel);

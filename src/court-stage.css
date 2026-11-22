@@ -1,8 +1,6 @@
 .court-crest { border: 0; background: none; clip-path: none; }
 .court-crest img { width: 100%; height: 100%; object-fit: contain; }
 .phase-menu .menu-scene .scene-host { display: none; }
-.court-hero-art { width: 100%; height: 100%; display: grid; align-items: center; }
-.court-hero-art .rule-entrance { position: static; width: 100%; max-width: none; margin: 0; opacity: 1; border: 0; box-shadow: none; background: transparent; }
 .rite-recommended { display: inline-block; color: #241c15; background: #dcc18b; font-size: .68em; padding: 1px 5px; margin-left: 3px; }
 .rite-explainer { margin: 10px 0; max-width: 32rem; }
 .rite-explainer summary { cursor: pointer; color: #dec698; line-height: 1.6; }
@@ -17,22 +15,5 @@
  .game-scene { left: calc(max(170px,16vw) + 5vw); right: 42px; }
  .phase-play .game-scene { top: 176px; bottom: 140px; }
 }
-.court-flash { position: fixed; top: clamp(105px,20dvh,190px); right: clamp(15px,8vw,120px); width: min(45vw,290px); z-index: 17; pointer-events: none; color: #e5cc9a; animation: court-flash .48s cubic-bezier(.12,.8,.25,1) both; }
-.court-flash svg { display: block; }
-.flash-field { fill: #172535; stroke: currentColor; stroke-opacity: .55; }
-.flash-cut { fill: currentColor; }
-.flash-stroke,.flash-seal { fill: none; stroke: currentColor; }
-.flash-seal { display: none; }
-.flash-slide { width: min(28vw,150px); opacity: .55; }
-.flash-slide .flash-field { fill-opacity: .3; }
-.flash-charge,.flash-dash { color: #bdeaff; }
-.flash-rite { color: #ead0ff; }
-.flash-charge .flash-seal,.flash-rite .flash-seal { display: block; }
-.flash-charge .flash-cut,.flash-rite .flash-cut { display: none; }
-@keyframes court-flash { 0%{opacity:0;transform:translateX(45px) skewX(-8deg)} 22%,57%{opacity:1;transform:none} 100%{opacity:0;transform:translateX(-17px)} }
-@media(prefers-reduced-motion:reduce){.court-flash{display:none}}
-.flash-profile,.flash-profile-rim,.flash-crown { display:none; }
-.flash-charge .flash-profile,.flash-charge .flash-profile-rim,.flash-dash .flash-profile,.flash-dash .flash-profile-rim,.flash-rite .flash-crown { display:block; }
-.flash-profile { fill:#12202c; stroke:currentColor; }
-.flash-profile-rim { fill:none; stroke:currentColor; stroke-opacity:.8; }
-.flash-crown { fill:currentColor; }
+
+.scene-host > .board-ink { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; pointer-events:none; }
