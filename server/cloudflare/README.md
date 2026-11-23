@@ -37,13 +37,13 @@ npm run build
    npm run deploy:multiplayer
    ```
 
-2. 将命令输出的 HTTPS Worker 根地址设为 GitHub 仓库 `suducat/shadow-king` 的 Actions 变量 `VITE_MULTIPLAYER_URL`。可以用 GitHub 网页的 **Settings → Secrets and variables → Actions → Variables**，或运行：
+2. GitHub Pages 工作流已配置正式 Worker 地址。换用其他 Worker 时，可将新的 HTTPS 根地址设为 GitHub 仓库 `suducat/shadow-king` 的 Actions 变量 `VITE_MULTIPLAYER_URL`。可以用 GitHub 网页的 **Settings → Secrets and variables → Actions → Variables**，或运行：
 
    ```sh
    gh variable set VITE_MULTIPLAYER_URL --repo suducat/shadow-king --body 'https://shadow-king-multiplayer.<你的子域>.workers.dev'
    ```
 
-3. 合并迁移分支，现有 Pages 工作流会构建并部署。已合并时可以在 Actions 手动运行 **Deploy GitHub Pages**。用 `curl https://<Worker地址>/health` 检查版本，再从 Pages 用两台设备验证一局。
+3. 合并迁移分支，现有 Pages 工作流会先检查 Worker 的 `/health`，再构建并部署。已合并时可以在 Actions 手动运行 **Deploy GitHub Pages**。发布后从 Pages 用两台设备验证一局。
 
 `ALLOWED_ORIGINS` 默认只允许 `https://suducat.github.io`。自定义域名应加入这一列表。前端配置只包含公开地址，不包含 Cloudflare 凭据。Cloudflare 登录或自动化用的账号 Token 只用在部署端。
 
