@@ -44,7 +44,6 @@ export function CourtSocial({room,send}:{room:CourtSession['state'];send:(kind:C
  return <div className="court-social">
   <div className="court-social-players">{(['red','blue'] as const).map(side=><div key={side}>
    <small className={side}>{sideName[side]}</small><strong>{room.profiles?.[side]?.nickname??'执棋者'}</strong>
-   {room.profiles?.[side]&&<small className="court-player-id">ID {room.profiles[side]?.id}</small>}
    {bubble?.side===side&&<div key={bubble.kind+bubble.id} className={`court-bubble ${side}`} role="status">
     {bubble.kind==='whisper'?WHISPERS[bubble.id]:<span role="img" aria-label={EMOTES[bubble.id]}><KingEmote id={bubble.id}/></span>}
    </div>}

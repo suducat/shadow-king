@@ -27,10 +27,9 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   }));
   const [red,blue]=pages;
   const names=['赤星','蓝月'];
-  const ids=await Promise.all(pages.map(async(p,i)=>{
+  await Promise.all(pages.map(async(p,i)=>{
    await p.getByLabel('昵称',{exact:true}).fill(names[i]);
    await button(p,'保存昵称').click();
-   return p.locator('.court-profile .court-player-id').textContent();
   }));
   await red.getByRole('button',{name:/发起邀约/}).click();
   const code=await red.locator('.court-code').textContent();
@@ -53,7 +52,13 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   await Promise.all(pages.map(p=>settled(p,0)));
   assert.equal(redIds.length,7);
   for(const p of pages){
-   for(const id of ids)await p.locator('.court-social').getByText(id,{exact:true}).waitFor();
+   const players=p.locator('.court-social-players');
+   for(const name of names)await players.getByText(name,{exact:true}).waitFor();
+   assert.equal(await players.locator('.court-player-id').count(),0);
+   const playerBounds=await players.boundingBox();
+   const viewport=p.viewportSize();
+   assert.ok(playerBounds && playerBounds.y>viewport.height-175);
+   assert.ok(playerBounds.x<90 || playerBounds.x+playerBounds.width>viewport.width-25);
    assert.equal(await p.getByLabel(/接收王庭/).count(),0);
    const bounds=await button(p,'王庭密语').boundingBox();
    assert.ok(bounds && (bounds.x<25 || bounds.x+bounds.width>p.viewportSize().width-25));
