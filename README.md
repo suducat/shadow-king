@@ -43,11 +43,7 @@ npm run dev
 <details>
 <summary>联机实现与浏览器测试</summary>
 
-GitHub Pages 使用 PeerJS 公共信令及 WebRTC DataChannel，无需账号、自建游戏后端或数据库。密令用于寻找当前开着的房间。WebRTC 优先直连，并提供 Open Relay 的 TCP/TLS TURN 作为受限网络的备选路径。信令或中继不可达时，界面会说明失败阶段。建立连接或同步超时会提示退出重试，本版本没有断线续局。
-
-每端只保存自己的真实阵容和已公开的对方身份。开局交换带随机盐的身份承诺，吃子、蓄力及王公开时验证相应凭据。双方通过现有规则独立结算，按对局 ID、阵营、回合和操作编号验证动作。经典模式的重复局面依赖真实角色分布，因此仅在公开棋位满足三次重复的候选条件时，双方交换各自匹配的历史回合编号。这会透露有限的局面相等关系。P2P 适用于休闲对局，无法阻止篡改客户端故意选用异常布局、隐瞒重复结果或中断游戏。
-
-`npm test` 覆盖私有视图结算、身份承诺及特殊胜利。可用 `node tests/online-browser.cjs` 对两个独立 Chromium 环境和一个额外的房间占用测试环境执行联机流程。测试需要独立的 PeerServer（只用于测试）及测试构建。用 `VITE_PEER_TEST_PORT=17366 npm run build:test` 将测试信令定向本机，由 HTTP 服务器将 `dist-test` 挂载于 `http://127.0.0.1:17367/shadow-king/`。可以通过环境变量 `SK_ONLINE_BASE` 指定其他测试页面地址。可用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 选择支持 WebRTC 的独立 Chromium；受管浏览器可能禁用直连测试所需的 UDP。正式构建使用 PeerJS 公共信令与 [Open Relay 公共中继](https://www.metered.ca/tools/openrelay/)。
+GitHub Pages 提供游戏页面。王庭邀约由 Cloudflare Worker 和 Durable Objects 通过 WebSocket 同步，断线时保留席位和棋局供当前页面重连。生产部署、环境变量和联机测试见[王庭邀约服务说明](server/cloudflare/README.md)。
 
 </details>
 

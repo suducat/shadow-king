@@ -24,7 +24,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run typecheck:multiplayer
+      - name: Build with the multiplayer service URL
+        run: |
+          curl --fail --silent --show-error --max-time 10 --retry 5 --retry-delay 5 "${VITE_MULTIPLAYER_URL%/}/health"
+          npm run build
+        env:
+          VITE_MULTIPLAYER_URL: ${{ vars.VITE_MULTIPLAYER_URL || 'https://shadow-king-multiplayer.shadow-king.workers.dev' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
