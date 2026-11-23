@@ -62,7 +62,7 @@ export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back,profi
    {(['red','blue'] as const).map(side=>{
     const local=side===room.side,placed=local?room.ready:room.otherReady;
     return <div key={side} className={side}><Crown size={19}/><strong>{sideName[side]}</strong>
-     <span className="court-ready-profile">{room.profiles?.[side]?.nickname??(local?profile.nickname:'执棋者')}<small className="court-player-id">{room.profiles?.[side]?.id??(local?profile.id:'')}</small></span>
+     <span className="court-ready-profile"><span>{room.profiles?.[side]?.nickname??(local?profile.nickname:'执棋者')}</span><small className="court-player-id">{room.profiles?.[side]?.id??(local?profile.id:'')}</small></span>
      <span>{placed?(local?'己方就位':'对方就位'):'未就位'}</span></div>;
    })}
    <button className="primary" onClick={toggle} disabled={room.starting}>{room.ready?'取消就位':'就位'}</button>
