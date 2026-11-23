@@ -1,4 +1,4 @@
-import {courtIce} from './court-ice';
+import {courtIce,relayConfiguration} from './court-ice';
 import type {DataConnection,Peer as PeerInstance} from 'peerjs';
 import {other,type Game,type Role,type Side} from './game';
 import type {GameAction,GameMode} from './ritual';
@@ -11,7 +11,7 @@ const protocol=3,gameVersion='0.8.1';
 const namespace='shadow-king-summons-v1-';
 const failure='邀约未能建立，请重试。';
 const signalFailure='暂时无法连接邀约服务，请检查网络后重试。';
-const channelFailure='已找到邀约，但两台设备未建立连接。请切换网络后重试。';
+const channelFailure='直连和中继均未连通。请保持房主页打开，换用另一网络后重试。';
 const invalid='密令无效或已失效。';
 const full='此局已有执棋者。';
 const absent='对方暂离王庭';
@@ -96,6 +96,9 @@ export class CourtSession{
   try{
    const {default:Peer}=await import('peerjs');
    const testPort=import.meta.env.MODE==='test'?import.meta.env.VITE_PEER_TEST_PORT:undefined;
+   const testRelay=import.meta.env.MODE==='test'?import.meta.env.VITE_TURN_TEST_URL:undefined;
+   const ice=testPort?{iceServers:testRelay?[{urls:testRelay,username:'court-test',credential:'court-test'}]:[]}:await courtIce();
+   const hasRelay=!testPort||!!testRelay;
    const host=this.state.side==='red';
    const visit=identifier();
    let collisions=0,retried=false,relayOnly=false;
@@ -105,9 +108,10 @@ export class CourtSession{
     this.peer?.destroy();
     this.arm(signalFailure,9000);
     const room=host?code():this.state.code;
+    const config=relayOnly&&hasRelay?relayConfiguration(ice):ice;
     const signal=testPort?
-     {host:'127.0.0.1',port:Number(testPort),path:'/',secure:false,config:{iceServers:[]}}:
-     {secure:true,config:{...await courtIce(),...(relayOnly?{iceTransportPolicy:'relay' as const}:{})}};
+     {host:'127.0.0.1',port:Number(testPort),path:'/',secure:false,config}:
+     {secure:true,config};
     if(!this.active||generation!==this.peerGeneration)return;
     const peer=host?new Peer(namespace+room,signal):new Peer(signal);
     this.peer=peer;
@@ -136,7 +140,7 @@ export class CourtSession{
       if(!this.channel){clearTimeout(this.timer);this.update({stage:'waiting',code:room,message:''});}
      }else{
       if(!retried)this.update({message:'正在寻找密令对应的王庭……'});
-      this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json',metadata:{visit}}),retryJoin);
+      this.attach(peer.connect(namespace+room,{reliable:true,serialization:'json',metadata:{visit,attempt:retried?2:1,route:relayOnly&&hasRelay?'relay':'auto'}}),retryJoin,relayOnly&&hasRelay);
      }
     });
     peer.on('connection',channel=>{
@@ -144,7 +148,9 @@ export class CourtSession{
      // A retry from the same tab may arrive before the old channel reports
      // its closure. Never replace an established match or a different guest.
      if(host&&this.channel&&!this.game&&typeof channel.metadata?.visit==='string'&&
-      channel.metadata.visit===this.channel.metadata?.visit){
+      channel.metadata.visit===this.channel.metadata?.visit&&
+      (channel.metadata.attempt===2||(channel.metadata.attempt===undefined&&this.channel.metadata?.attempt===undefined))&&
+      (this.channel.metadata?.attempt??1)===1){
       this.detachChannel();this.resetLobby();
       this.update({stage:'waiting',ready:false,otherReady:false,starting:false});
      }
@@ -153,7 +159,14 @@ export class CourtSession{
       if(channel.open)reject();else channel.once('open',reject);
       return;
      }
-     this.attach(channel);
+     // PeerJS emits the offer before creating its local answer. Set the host's
+     // ICE policy on this channel so a relay retry gathers on both devices.
+     const relayed=hasRelay&&channel.metadata?.route==='relay';
+     if(relayed&&channel.peerConnection){
+      try{channel.peerConnection.setConfiguration(relayConfiguration(channel.peerConnection.getConfiguration()));}
+      catch{ /* Let the existing ICE configuration try its candidates. */ }
+     }
+     this.attach(channel,undefined,relayed);
     });
     peer.on('error',error=>{
      if(!current())return;
@@ -201,7 +214,7 @@ export class CourtSession{
   this.update({stage:'waiting',ready:false,otherReady:false,starting:false,message:'对方未完成连接，仍可使用此密令。'});
   this.resumeHost?.();
  }
- private attach(channel:DataConnection,retryJoin?:(message:string)=>void){
+ private attach(channel:DataConnection,retryJoin?:(message:string)=>void,relay=false){
   this.channel=channel;this.lastSignal=Date.now();
   const current=()=>this.active&&this.channel===channel;
   let openedOnce=false;
@@ -211,15 +224,32 @@ export class CourtSession{
    if(!this.game&&this.state.stage==='connecting'&&retryJoin){retryJoin(openedOnce&&message===channelFailure?failure:message);return;}
    this.fail(this.match?absent:message);
   };
-  this.arm(channelFailure,12_000,()=>drop());
+  this.arm(channelFailure,relay?13_000:10_000,()=>drop());
   const pc=channel.peerConnection;
+  let answered=false,localRelay=false;
   const onIce=()=>{
    if(!current()||channel.open)return;
    if(pc.iceConnectionState==='failed'){drop();return;}
-   if(this.state.side==='blue'&&pc.remoteDescription)this.update({message:'已找到王庭，正在建立两台设备的连接……'});
+   if(this.state.side==='blue'&&pc.remoteDescription&&!answered){
+    answered=true;
+    this.update({message:relay?'已找到王庭，正在通过中继连接……':'已找到王庭，正在尝试直连或中继……'});
+   }
+  };
+  const onCandidate=({candidate}:RTCPeerConnectionIceEvent)=>{
+   if(!current()||channel.open)return;
+   if(candidate?.type==='relay'||candidate?.candidate.includes(' typ relay '))localRelay=true;
+   if(!candidate&&relay&&this.state.side==='blue'&&!localRelay&&pc.iceGatheringState==='complete'){
+    drop();
+   }
   };
   pc?.addEventListener('iceconnectionstatechange',onIce);
-  channel.once('close',()=>pc?.removeEventListener('iceconnectionstatechange',onIce));
+  pc?.addEventListener('signalingstatechange',onIce);
+  pc?.addEventListener('icecandidate',onCandidate);
+  channel.once('close',()=>{
+   pc?.removeEventListener('iceconnectionstatechange',onIce);
+   pc?.removeEventListener('signalingstatechange',onIce);
+   pc?.removeEventListener('icecandidate',onCandidate);
+  });
   const opened=()=>{
    if(!current()||openedOnce)return;
    openedOnce=true;

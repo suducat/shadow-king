@@ -11,7 +11,16 @@ export async function courtIce():Promise<RTCConfiguration>{
  const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,encoder.encode(username)));
  return {iceServers:[
   {urls:['stun:stun.cloudflare.com:3478','stun:stun.l.google.com:19302']},
-  {urls:[`turn:${relayHost}:80?transport=tcp`,`turn:${relayHost}:443?transport=tcp`,`turns:${relayHost}:443?transport=tcp`],
+  {urls:[
+   `turn:${relayHost}:80?transport=udp`,`turn:${relayHost}:443?transport=udp`,
+   `turn:${relayHost}:80?transport=tcp`,`turn:${relayHost}:443?transport=tcp`,
+   `turns:${relayHost}:443?transport=tcp`,
+  ],
    username,credential:btoa(String.fromCharCode(...bytes))},
  ]};
+}
+
+
+export function relayConfiguration(config:RTCConfiguration):RTCConfiguration{
+ return {...config,iceTransportPolicy:'relay'};
 }
