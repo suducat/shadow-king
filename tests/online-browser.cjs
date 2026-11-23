@@ -13,6 +13,7 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   for(const page of pages){
    page.on('pageerror',error=>errors.push(error.message));
    await page.addInitScript(()=>{
+    localStorage.setItem('shadow-king-court-muted','true');
     localStorage.setItem('shadow-king-settings',JSON.stringify({quality:'low',reduced:true,muted:true,music:0,effects:0}));
     const Real=window.WebSocket;window.courtSockets=[];
     window.WebSocket=class extends Real{
@@ -53,24 +54,27 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   assert.equal(redIds.length,7);
   for(const p of pages){
    for(const id of ids)await p.locator('.court-social').getByText(id,{exact:true}).waitFor();
-   await p.locator('.court-interactions summary').click();
+   assert.equal(await p.getByLabel(/接收王庭/).count(),0);
+   const bounds=await button(p,'王庭密语').boundingBox();
+   assert.ok(bounds && (bounds.x<25 || bounds.x+bounds.width>p.viewportSize().width-25));
   }
   const phrases=['漂亮的一步。','你确定吗？','我已看穿你的布局。','这正合我意。','你所见的，未必是真相。','王，就在你眼前。','竟然如此……','胜负尚未注定。'];
   const emotes=['王笑','王哭','王疑问'];
   for(const [i,label] of [...phrases,...emotes].entries()){
    const [sender,receiver]=i%2?[blue,red]:[red,blue];
+   await button(sender,'王庭密语').click();
    await button(sender,label).click();
-   if(i===0)await sender.locator('.court-phrases button:disabled').first().waitFor();
-   const bubble=receiver.locator('.court-bubble');
-   if(i<phrases.length)await bubble.getByText(label,{exact:true}).waitFor();
-   else await bubble.getByRole('img',{name:label}).waitFor();
+   await sender.locator('#court-chat-panel').waitFor({state:'hidden'});
+   await Promise.all([sender,receiver].map(p=>{
+    const bubble=p.locator('.court-bubble');
+    return i<phrases.length?bubble.getByText(label,{exact:true}).waitFor():bubble.getByRole('img',{name:label}).waitFor();
+   }));
+   if(i===0){
+    await button(sender,'王庭密语').click();
+    await sender.locator('.court-phrases button:disabled').first().waitFor();
+    await button(sender,'王庭密语').click();
+   }
   }
-  await red.getByLabel('接收王庭互动').uncheck();
-  await button(blue,phrases[0]).click();
-  await blue.waitForTimeout(500);
-  assert.equal(await red.locator('.court-bubble').count(),0);
-  assert.equal(await red.evaluate(()=>localStorage.getItem('shadow-king-court-muted')),'true');
-  for(const p of pages)await p.locator('.court-interactions summary').click();
   await key(red,0,6);await key(red,0,5);
   await Promise.all(pages.map(p=>settled(p,1)));
   await blue.evaluate(()=>window.courtSockets.at(-1).close(4007,'test interruption'));

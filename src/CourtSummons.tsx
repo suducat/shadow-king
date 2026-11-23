@@ -1,4 +1,3 @@
-import {CourtReception} from './CourtSocial';
 import {courtProfile,saveProfile} from './court-profile';
 import {readProfile} from './court-protocol';
 import {sideName} from './game';
@@ -36,7 +35,6 @@ export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back,profi
    saveProfile(next);setProfile(next);setNickname(next.nickname);profileChanged();
   }}><label htmlFor="court-nickname">昵称</label><input id="court-nickname" maxLength={24} value={nickname} onChange={e=>setNickname(e.target.value)} />
    <button className="secondary" disabled={nickname===profile.nickname}>保存昵称</button><small className="court-player-id">ID {profile.id}</small></form>
-  <CourtReception/>
   {waiting&&<div className="court-invitation">
    <span>邀约密令</span><strong className="court-code" aria-label="邀约密令">{room.code}</strong>
    <button className="secondary" onClick={async()=>{

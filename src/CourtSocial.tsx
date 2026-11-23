@@ -1,16 +1,9 @@
 import {useEffect,useState} from 'react';
 import {EMOTES,WHISPERS,type CourtInteraction,type CourtProfile} from './court-protocol';
-import {courtMuted,setCourtMuted} from './court-profile';
+import {MessageCircle} from 'lucide-react';
 import type {CourtSession} from './court-session';
 import {modeOf} from './ritual';
 import {sideName,other,type Game} from './game';
-
-export function CourtReception({onChange}: {onChange?:(enabled:boolean)=>void}){
- const [enabled,setEnabled]=useState(()=>!courtMuted());
- return <label className="court-reception"><input type="checkbox" checked={enabled} onChange={e=>{
-  const checked=e.target.checked;setCourtMuted(!checked);setEnabled(checked);onChange?.(checked);
- }}/> 接收王庭互动</label>;
-}
 
 function KingEmote({id}:{id:number}){
  return <svg viewBox="0 0 64 64" width="38" height="38" aria-hidden="true">
@@ -30,11 +23,12 @@ function KingEmote({id}:{id:number}){
 }
 
 export function CourtSocial({room,send}:{room:CourtSession['state'];send:(kind:CourtInteraction['kind'],id:number)=>void}){
+ const [open,setOpen]=useState(false);
  const [bubble,setBubble]=useState<CourtInteraction>();
  const [,refreshCooldown]=useState(0);
  const interaction=room.interaction;
  useEffect(()=>{
-  setBubble(!courtMuted()?interaction:undefined);
+  setBubble(interaction);
   if(!interaction)return;
   const timer=setTimeout(()=>setBubble(undefined),3000);
   return ()=>clearTimeout(timer);
@@ -46,22 +40,22 @@ export function CourtSocial({room,send}:{room:CourtSession['state'];send:(kind:C
   return ()=>clearTimeout(timer);
  },[room.sendUntil]);
  const disabled=Date.now()<(room.sendUntil??0)||room.stage!=='playing'||room.opponentPaused;
+ function sendAndClose(kind:CourtInteraction['kind'],id:number){send(kind,id);setOpen(false);}
  return <div className="court-social">
   <div className="court-social-players">{(['red','blue'] as const).map(side=><div key={side}>
    <small className={side}>{sideName[side]}</small><strong>{room.profiles?.[side]?.nickname??'执棋者'}</strong>
    {room.profiles?.[side]&&<small className="court-player-id">ID {room.profiles[side]?.id}</small>}
-   {bubble?.side===side&&<div key={bubble.kind+bubble.id} className="court-bubble" role="status">
+   {bubble?.side===side&&<div key={bubble.kind+bubble.id} className={`court-bubble ${side}`} role="status">
     {bubble.kind==='whisper'?WHISPERS[bubble.id]:<span role="img" aria-label={EMOTES[bubble.id]}><KingEmote id={bubble.id}/></span>}
    </div>}
   </div>)}</div>
-  {room.stage!=='deploying'&&<details className="court-interactions">
-   <summary>王庭密语</summary>
-   <div className="court-interaction-panel">
-    <div className="court-phrases">{WHISPERS.map((phrase,id)=><button type="button" key={phrase} disabled={disabled} onClick={()=>send('whisper',id)}>{phrase}</button>)}</div>
-    <small>王庭戏法</small><div className="court-emotes">{EMOTES.map((name,id)=><button type="button" key={name} aria-label={name} title={name} disabled={disabled} onClick={()=>send('emote',id)}><KingEmote id={id}/></button>)}</div>
-    <CourtReception onChange={enabled=>{if(!enabled)setBubble(undefined);}}/>
+  {room.stage!=='deploying'&&<div className="court-interactions" onKeyDown={e=>{if(e.key==='Escape')setOpen(false);}}>
+   <button type="button" className="secondary court-chat-trigger" title="王庭密语" aria-label="王庭密语" aria-expanded={open} aria-controls="court-chat-panel" onClick={()=>setOpen(value=>!value)}><MessageCircle size={20} aria-hidden="true"/></button>
+   <div id="court-chat-panel" className="court-interaction-panel" hidden={!open}>
+    <div className="court-phrases">{WHISPERS.map((phrase,id)=><button type="button" key={phrase} disabled={disabled} onClick={()=>sendAndClose('whisper',id)}>{phrase}</button>)}</div>
+    <small>王庭戏法</small><div className="court-emotes">{EMOTES.map((name,id)=><button type="button" key={name} aria-label={name} title={name} disabled={disabled} onClick={()=>sendAndClose('emote',id)}><KingEmote id={id}/></button>)}</div>
    </div>
-  </details>}
+  </div>}
  </div>;
 }
 

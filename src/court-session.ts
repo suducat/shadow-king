@@ -1,4 +1,4 @@
-import {courtMuted,courtProfile} from './court-profile';
+import {courtProfile} from './court-profile';
 import {type Game,type Role,type Side} from './game';
 import {COURT_COOLDOWN,readInteraction,type CourtInteraction,COURT_SOCKET,COURT_VERSION,type CourtCommand,type CourtIntent,type CourtNotice,type CourtSnapshot,type ProjectedGame,type RoomTicket} from './court-protocol';
 import type {GameAction,GameMode} from './ritual';
@@ -102,7 +102,7 @@ export class CourtSession{
    }else if(data?.type==='interaction-sent'){
     if(data.matchId===this.matchId)this.update({sendUntil:Date.now()+COURT_COOLDOWN});
    }else if(data?.type==='interaction'){
-    if(data.matchId===this.matchId&&data.side!==this.state.side&&readInteraction(data)&&!courtMuted())this.update({interaction:data});
+    if(data.matchId===this.matchId&&data.side!==this.state.side&&readInteraction(data))this.update({interaction:data});
    }else if(data?.type==='closed'){
     this.ticket=undefined;this.dropSocket();this.fail(data.message);
    }else if(data?.type==='error'){
@@ -187,7 +187,8 @@ export class CourtSession{
  private send(command:CourtCommand){return this.sendRaw(command);}
  sendInteraction(kind:CourtInteraction['kind'],id:number){
   if(this.state.stage!=='playing'||this.state.opponentPaused||this.game?.result||Date.now()<(this.state.sendUntil??0))return;
-  if(this.sendRaw({type:'interaction',kind,id,matchId:this.matchId}))this.update({sendUntil:Date.now()+COURT_COOLDOWN});
+  if(this.sendRaw({type:'interaction',kind,id,matchId:this.matchId}))this.update({sendUntil:Date.now()+COURT_COOLDOWN,
+   interaction:{type:'interaction',kind,id,matchId:this.matchId,side:this.state.side}});
  }
  updateProfile(){this.sendRaw({type:'profile',profile:courtProfile()});}
  toggleReady(){if(this.state.stage==='ready')this.send({type:'ready',value:!this.state.ready});}
