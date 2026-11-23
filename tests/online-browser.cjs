@@ -36,7 +36,7 @@ const publicState=s=>({
 (async()=>{
  const browser=await chromium.launch({headless:true,
   executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),
-  args:[...(formationOnly?['--disable-webgl']:[]),'--use-angle=swiftshader','--enable-unsafe-swiftshader',
+  args:[...(new URL(base).hostname==='127.0.0.1'?['--no-proxy-server']:[]),...(formationOnly?['--disable-webgl']:[]),'--use-angle=swiftshader','--enable-unsafe-swiftshader',
    '--disable-features=WebRtcHideLocalIpsWithMdns,LocalNetworkAccessChecks,LocalNetworkAccessChecksWebRTC,LocalNetworkAccessChecksWebSockets'],
  });
  try{
