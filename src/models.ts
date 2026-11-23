@@ -30,12 +30,12 @@ function turned(parent:T.Object3D,m:T.Material,profile:number[][],sides=48) {ret
 function disk(parent:T.Object3D,m:T.Material,r:number,y:number,tube=.006) { const o=add(parent,new T.TorusGeometry(r,tube,4,segments(48,20)),m,[0,y,0]);o.rotation.x=Math.PI/2;return o; }
 function emboss(parent:T.Object3D,m:T.Material,shape:T.Shape,depth=.014) {return add(parent,new T.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelSegments:detail==='low'?1:2,steps:1,bevelSize:.008,bevelThickness:.006,curveSegments:segments(12,6)}),m);}
 function shieldShape(w:number,h:number){const s=new T.Shape();s.moveTo(0,-h*.55);s.bezierCurveTo(-w*.55,-h*.25,-w*.5,h*.1,-w*.42,h*.42);s.quadraticCurveTo(0,h*.65,w*.42,h*.42);s.bezierCurveTo(w*.5,h*.1,w*.55,-h*.25,0,-h*.55);return s;}
-function palette(side:Side){const red=side==='red',tex=detail==='low'?null:surface('fabric'),patina=detail==='low'?null:surface('metal');const m=(color:number,metalness=.7,roughness=.35)=>new T.MeshStandardMaterial({color,metalness,roughness,roughnessMap:patina,bumpMap:patina,bumpScale:.0015,side:T.DoubleSide});return {
-  steel:m(red?0xa4a8a4:0x91b4c2,.86,.46),gold:m(0xb89453,.86,.4),shade:m(0x17242a,.55,.59),skin:m(0xad9275,.06,.78),
-  cloth:new T.MeshStandardMaterial({color:red?0x68262e:0x203d59,roughness:.95,metalness:0,bumpMap:tex,bumpScale:.006,side:T.DoubleSide}),
-  lining:new T.MeshStandardMaterial({color:red?0xa84a44:0x4f829d,roughness:.87,metalness:.02,side:T.DoubleSide}),
+function palette(){const tex=detail==='low'?null:surface('fabric'),patina=detail==='low'?null:surface('metal');const m=(color:number,metalness=.7,roughness=.35)=>new T.MeshStandardMaterial({color,metalness,roughness,roughnessMap:patina,bumpMap:patina,bumpScale:.0015,side:T.DoubleSide});return {
+  steel:m(0xa4a8a4,.86,.46),gold:m(0xb89453,.86,.4),shade:m(0x17242a,.55,.59),skin:m(0xad9275,.06,.78),
+  cloth:new T.MeshStandardMaterial({color:0x68262e,roughness:.95,metalness:0,bumpMap:tex,bumpScale:.006,side:T.DoubleSide}),
+  lining:new T.MeshStandardMaterial({color:0xa84a44,roughness:.87,metalness:.02,side:T.DoubleSide}),
   violet:m(0x493951,.08,.9),leather:m(0x302726,.02,.94),
-  magic:new T.MeshStandardMaterial({color:red?0xf0c17e:0xa5e3fa,emissive:red?0xbd682e:0x408dae,emissiveIntensity:.65,metalness:.4,roughness:.22}),
+  magic:new T.MeshStandardMaterial({color:0xf0c17e,emissive:0xbd682e,emissiveIntensity:.65,metalness:.4,roughness:.22}),
   purple:new T.MeshStandardMaterial({color:0xc3a0df,emissive:0x76509d,emissiveIntensity:.85,metalness:.35,roughness:.28}),
 };}
 type Palette=ReturnType<typeof palette>;
@@ -191,8 +191,9 @@ function batch(group:T.Group){
     objects.forEach(o=>{group.remove(o);o.geometry.dispose();});geometries.forEach(g=>g.dispose());const indexed=mergeVertices(merged,1e-6);merged.dispose();add(group,indexed,material);
   }
 }
-function buildCharacter(role:VisibleRole,side:Side):Character {
-  const model=new T.Group(),body=new T.Group(),p=palette(side),rig:CharacterRig={body,leftLeg:new T.Group(),rightLeg:new T.Group(),crown:new T.Group(),weapon:new T.Group(),cape:new T.Group(),leftArm:new T.Group(),rightArm:new T.Group(),seal:new T.Group()};
+function buildCharacter(role:VisibleRole):Character {
+  const model=new T.Group(),body=new T.Group(),p=palette(),rig:CharacterRig={body,leftLeg:new T.Group(),rightLeg:new T.Group(),crown:new T.Group(),weapon:new T.Group(),cape:new T.Group(),leftArm:new T.Group(),rightArm:new T.Group(),seal:new T.Group()};
+  for(const name of ['steel','cloth','lining','magic'] as const)p[name].userData.sideTint=name;
   for(const [name,part]of Object.entries(rig)){part.name=`rig-${name}`;if(part!==body)body.add(part);}model.add(body);base(model,p,role);
   if(role==='king')royal(body,rig,p);else if(role==='guard')knight(body,rig,p);else if(role==='martyr')priest(body,rig,p);else sealed(body,rig,p);
   const pivots:[T.Group,T.Vector3][]=[[rig.leftArm,V(-.19,1.07,0)],[rig.rightArm,V(.19,1.07,0)],[rig.cape,V(0,1.11,-.06)],[rig.leftLeg,V(-.095,.77,0)],[rig.rightLeg,V(.095,.77,0)],[rig.crown,V(0,1.4,0)]];
@@ -206,7 +207,6 @@ function buildCharacter(role:VisibleRole,side:Side):Character {
   for(const part of Object.values(rig)){part.userData.bindPosition=part.position.toArray();part.userData.bindRotation=part.rotation.toArray();}
   batch(model);
   // A uniform scale keeps all base positions and visual footprints tied to one cell.
-  model.rotation.y=side==='red'?Math.PI:0;
   const pick=bodyPickMesh(role);
   return {model,pick,rig};
 }
@@ -214,28 +214,76 @@ function buildCharacter(role:VisibleRole,side:Side):Character {
 // Immutable render resources survive perspective handoffs. Only the currently
 // visible clone is attached to the scene; no hidden-role model is rendered.
 const templates=new Map<string,Character>();
-export function createCharacter(role:VisibleRole,side:Side,quality:Quality='high'):Character {
-  detail=quality;
-  const key=side+':'+role+':'+quality;let source=templates.get(key);
+function characterTemplate(role:VisibleRole,quality:Quality){
+  const key=role+':'+quality;
+  let source=templates.get(key);
   if(!source){
-    source=buildCharacter(role,side);
+    detail=quality;
+    source=buildCharacter(role);
     source.model.traverse(o=>{if(o instanceof T.Mesh){o.geometry.userData.shared=true;for(const m of (Array.isArray(o.material)?o.material:[o.material])){m.userData.shared=true;for(const v of Object.values(m))if(v instanceof T.Texture)v.userData.shared=true;}}});
     templates.set(key,source);
   }
+  return source;
+}
+const blueTint={steel:0x91b4c2,cloth:0x203d59,lining:0x4f829d,magic:0xa5e3fa};
+export function createCharacter(role:VisibleRole,side:Side,quality:Quality='high'):Character {
+  const source=characterTemplate(role,quality);
   const model=source.model.clone(true),part=(name:string)=>model.getObjectByName('rig-'+name) as T.Group,rig:CharacterRig={body:part('body'),leftLeg:part('leftLeg'),rightLeg:part('rightLeg'),crown:part('crown'),weapon:part('weapon'),cape:part('cape'),leftArm:part('leftArm'),rightArm:part('rightArm'),seal:part('seal')};
-  // Object3D.clone copies the quaternion. Retain the authored yaw too:
-  // decomposing a half-turn can otherwise introduce 180° roll and pitch.
-  model.rotation.copy(source.model.rotation);
+  model.rotation.y=side==='red'?Math.PI:0;
   // Geometry/textures are immutable and cached. Opacity and other material
   // properties belong to ONE actor, including after a perspective replacement.
   const materials=new Map<string,T.Material>();
   model.traverse(o=>{if(o instanceof T.Mesh){
     let scope='base';for(let p:T.Object3D|null=o.parent;p&&p!==model;p=p.parent){if(p.name==='rig-crown'){scope='crown';break;}if(p.name==='rig-body')scope='body';}
-    const clone=(source:T.Material)=>{const key=source.uuid+'/'+scope;let own=materials.get(key);if(!own){own=source.clone();own.userData={...source.userData,shared:false,scope};if(import.meta.env.DEV||import.meta.env.MODE==='test')own.addEventListener('dispose',()=>{own!.userData.released=true;});materials.set(key,own);}return own;};
+    const clone=(source:T.Material)=>{
+      const key=source.uuid+'/'+scope;
+      let own=materials.get(key);
+      if(!own){
+        own=source.clone();
+        own.userData={...source.userData,shared:false,scope};
+        const tint=source.userData.sideTint as keyof typeof blueTint|undefined;
+        if(side==='blue'&&tint&&own instanceof T.MeshStandardMaterial){
+          own.color.setHex(blueTint[tint]);
+          if(tint==='magic')own.emissive.setHex(0x408dae);
+        }
+        if(import.meta.env.DEV||import.meta.env.MODE==='test')own.addEventListener('dispose',()=>{own!.userData.released=true;});
+        materials.set(key,own);
+      }
+      return own;
+    };
     o.material=Array.isArray(o.material)?o.material.map(clone):clone(o.material);
   }});
   return {model,rig,pick:bodyPickMesh(role)};
 }
+export type FallenMeshData={positions:Float32Array<ArrayBuffer>;indices:Uint16Array<ArrayBuffer>|Uint32Array<ArrayBuffer>};
+
+// Bake only the vertex positions and retain indices. The order of the
+// triangles stays the same as in the original translucent statue.
+export function buildFallenMesh(role:Exclude<VisibleRole,'unknown'>):FallenMeshData{
+  const {model}=characterTemplate(role,'low');
+  model.updateMatrixWorld(true);
+  const meshes:T.Mesh[]=[];
+  let vertices=0,indices=0;
+  model.traverse(object=>{
+    if(!(object instanceof T.Mesh))return;
+    const points=object.geometry.getAttribute('position');
+    meshes.push(object);
+    vertices+=points.count;
+    indices+=object.geometry.index?.count??points.count;
+  });
+  const positions=new Float32Array(vertices*3);
+  const triangles=vertices>65536?new Uint32Array(indices):new Uint16Array(indices);
+  const point=new T.Vector3();
+  let v=0,i=0;
+  for(const mesh of meshes){
+    const points=mesh.geometry.getAttribute('position'),index=mesh.geometry.index;
+    for(let j=0;j<points.count;j++)point.fromBufferAttribute(points,j).applyMatrix4(mesh.matrixWorld).toArray(positions,(v+j)*3);
+    for(let j=0;j<(index?.count??points.count);j++)triangles[i++]=v+(index?index.getX(j):j);
+    v+=points.count;
+  }
+  return {positions,indices:triangles};
+}
+
 export function disposeCharacters(){
   const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>(),textures=new Set<T.Texture>();
   for(const {model,pick} of templates.values())for(const object of [model,pick])object.traverse(o=>{if(o instanceof T.Mesh){geometries.add(o.geometry);for(const m of (Array.isArray(o.material)?o.material:[o.material])){materials.add(m);for(const v of Object.values(m))if(v instanceof T.Texture)textures.add(v);}}});

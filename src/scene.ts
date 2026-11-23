@@ -6,18 +6,19 @@ import {renderResolution} from './render-resolution';
 import {surface,disposeSurfaces,setSurfaceSampling} from './surfaces';
 import {BattleEffects} from './battle-effects';
 import {BoardInk} from './board-ink';
+import type {FallenMeshMessage} from './fallen.worker';
 import {battleTimeline,consumeCues,sampleBattle,drawStance,drawStart,drawSpan,retirementPose,disclosureDelay,neutralPose,smooth,clamp,type BattleCue,type Timeline,type PublicBeats} from './battle-timeline';
 import type {CueOptions} from './audio';
-import type { Side, VisiblePiece, VisibleRole,Capture } from './game';
+import type { Role, Side, VisiblePiece, VisibleRole,Capture } from './game';
 import {type GameMode,type Rites,type ActionStep} from './ritual';
-import { createCharacter, disposeCharacters,poseFigure, type CharacterRig } from './models';
+import { buildFallenMesh,createCharacter,disposeCharacters,poseFigure,type CharacterRig,type FallenMeshData } from './models';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { bodyPickMesh, cellToWorld, clientToNDC, intersectBoard,resolvePick } from './interaction';
 
 type SceneState = { pieces: VisiblePiece[]; selected: string | null; legal: { x: number; y: number }[]; viewer: Side | null; cinematic: boolean; reduced: boolean; deployment: boolean; active: boolean; mode?:GameMode; ritual?:Rites; preview?:ActionStep[]; pendingCharge?:string|null };
 type Unseal={start:number;color:number;surfaces:Map<T.MeshStandardMaterial,{color:T.Color;intensity:number}>};
-type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; unseal?:Unseal; publicIdentity:boolean; rest:()=>void; disposed:boolean;facing:number };
+type Actor = { group: T.Group; model: T.Group; rune: T.Mesh; role: VisibleRole; side: Side; target: T.Vector3; moving: number; pick: T.Mesh; rig?: CharacterRig; unseal?:Unseal; publicIdentity:boolean; rest:()=>void; materials:ReadonlySet<T.Material>; disposed:boolean;facing:number };
 const GOLD = 0xb7955d, RED = 0xd7654e, BLUE = 0x6ca9bd;
 const mat = (color: T.ColorRepresentation, metalness = .55, roughness = .42) => new T.MeshStandardMaterial({ color, metalness, roughness });
 const metal = mat(GOLD, .8, .3), darkMetal = mat(0x403b2d, .76, .35), obsidian = mat(0x111c20, .6, .5);
@@ -46,11 +47,11 @@ function makeActor(p: VisiblePiece,quality:Quality): Actor {
   const materials=new Map<T.Material,{opacity:number;transparent:boolean;depthWrite:boolean}>();model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material]))materials.set(m,{opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite});});
   const rest=()=>{group.scale.setScalar(1);group.visible=true;for(const p of poses){p.part.visible=true;p.part.position.copy(p.position);p.part.rotation.copy(p.rotation);p.part.scale.copy(p.scale);}model.traverse(o=>{if(o instanceof T.Mesh)o.visible=true;});for(const[m,r]of materials){const changed=m.transparent!==r.transparent||m.depthWrite!==r.depthWrite;m.opacity=r.opacity;m.transparent=r.transparent;m.depthWrite=r.depthWrite;if(changed)m.needsUpdate=true;}};
   group.userData={x:p.x,y:p.y,actorId:p.id};
-  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,disposed:false,facing:0,publicIdentity:false};
+  return {group,model,pick,rig,rune,role:p.role,side:p.side,target:group.position.clone(),moving:0,rest,materials:new Set(materials.keys()),disposed:false,facing:0,publicIdentity:false};
 }
 
 type Victim={id:string;actor:Actor;index:number;at:T.Vector3;disclosed:boolean;fracture?:T.Group;};
-type Motion={id:string;victimId?:string;role:VisibleRole;actor:Actor;victim?:Actor;victims:Victim[];steps:ActionStep[];execution:boolean;cues:BattleCue[];emitted:Set<number>;silent:boolean;impacts:Set<number>;restore:()=>void;from:T.Vector3;to:T.Vector3;start:number;duration:number;impact:boolean;finish:(completed:boolean)=>void;line:Timeline;publicBeats:PublicBeats;pendingState?:SceneState;beforeRites?:Rites;beforePieces:VisiblePiece[];ceremonyCommitted:boolean;lastProgress:number;fromFacing:number;goalFacing:number;groupKey:string;startLift:number};
+type Motion={id:string;victimId?:string;role:VisibleRole;actor:Actor;victim?:Actor;victims:Victim[];steps:ActionStep[];segments:{from:T.Vector3;to:T.Vector3;direction:T.Vector3}[];execution:boolean;cues:BattleCue[];emitted:Set<number>;silent:boolean;impacts:Set<number>;restore:()=>void;from:T.Vector3;to:T.Vector3;start:number;duration:number;impact:boolean;finish:(completed:boolean)=>void;line:Timeline;publicBeats:PublicBeats;pendingState?:SceneState;beforeRites?:Rites;beforePieces:VisiblePiece[];ceremonyCommitted:boolean;lastProgress:number;fromFacing:number;goalFacing:number;groupKey:string;startLift:number};
 let sceneSerial=0;
 const shortAngle=(angle:number)=>Math.atan2(Math.sin(angle),Math.cos(angle));
 export class BoardScene {
@@ -65,6 +66,9 @@ export class BoardScene {
   marks = new T.Group();
   fallen = new T.Group();
   private fallenKeys:string[] = [];
+  private fallenMeshes=new Map<Role,T.BufferGeometry>();
+  private fallenWorker?:Worker;
+  get fallenMeshesReady(){return this.fallenMeshes.size;}
   private boardMarks=new BoardMarks(this.marks);
   batches=new RigidBatches(this.root);
   batchingEnabled=true;
@@ -158,6 +162,7 @@ export class BoardScene {
     this.renderer.domElement.addEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.addEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.addEventListener('lostpointercapture', this.pointerCancel);
+    this.prepareFallenMeshes();
     this.animate();
   }
   private makeBoard() {
@@ -286,6 +291,29 @@ export class BoardScene {
     for(const[id,actor]of this.actors)this.removeActor(id,actor);
     this.update(this.state);this.resize();this.dirty=true;
   }
+  private prepareFallenMeshes(){
+    try {
+      const worker=new Worker(new URL('./fallen.worker.ts',import.meta.url),{type:'module'});
+      this.fallenWorker=worker;
+      const close=()=>{worker.terminate();if(this.fallenWorker===worker)this.fallenWorker=undefined;};
+      worker.onmessage=({data}:MessageEvent<FallenMeshMessage>)=>{
+        if(this.dead||this.fallenWorker!==worker)return;
+        this.cacheFallenMesh(data.role,data);
+        if(this.fallenMeshes.size===3)close();
+      };
+      worker.onerror=close;
+    }catch { /* blocked worker: build a missing asset once on demand */ }
+  }
+  private cacheFallenMesh(role:Role,data:FallenMeshData){
+    const cached=this.fallenMeshes.get(role);
+    if(cached)return cached;
+    const geometry=new T.BufferGeometry();
+    geometry.setAttribute('position',new T.BufferAttribute(data.positions,3));
+    geometry.setIndex(new T.BufferAttribute(data.indices,1));
+    geometry.userData.shared=true;
+    this.fallenMeshes.set(role,geometry);
+    return geometry;
+  }
   setFallen(captures:readonly Capture[]){
     const keys=captures.map(({side,role})=>side+'/'+role);
     let common=0;
@@ -298,24 +326,7 @@ export class BoardScene {
     const slots={red:0,blue:0};
     for(const {side} of captures.slice(0,common))slots[side]++;
     for(const {side,role} of captures.slice(common)){
-      const {model,pick}=createCharacter(role,side,'low');
-      pick.geometry.dispose();(pick.material as T.Material).dispose();
-      model.rotation.set(0,0,0);
-      model.updateMatrixWorld(true);
-      const parts:T.BufferGeometry[]=[];
-      const replaced=new Set<T.Material>();
-      model.traverse(object=>{
-        if(!(object instanceof T.Mesh))return;
-        for(const material of Array.isArray(object.material)?object.material:[object.material])replaced.add(material);
-        const source=object.geometry as T.BufferGeometry;
-        const part=source.index?source.toNonIndexed():source.clone();
-        part.applyMatrix4(object.matrixWorld);
-        for(const attribute of Object.keys(part.attributes))if(attribute!=='position')part.deleteAttribute(attribute);
-        parts.push(part);
-      });
-      const geometry=mergeGeometries(parts);
-      parts.forEach(part=>part.dispose());replaced.forEach(material=>material.dispose());
-      if(!geometry)continue;
+      const geometry=this.fallenMeshes.get(role)??this.cacheFallenMesh(role,buildFallenMesh(role));
       const tint=side==='red'?0xf0b3a5:0x9aeaff;
       const spectral=new T.MeshBasicMaterial({color:tint,transparent:true,opacity:.49,depthWrite:false});
       const spirit=new T.Mesh(geometry,spectral);
@@ -379,12 +390,14 @@ export class BoardScene {
     role=actor.role==='unknown'||role==='unknown'?'unknown':actor.role;this.lastSkipped=false;
     const victims=steps.flatMap((step,index)=>{const a=step.victimId?this.actors.get(step.victimId):undefined;return a?[{id:step.victimId!,actor:a,index,at:a.group.position.clone(),disclosed:false}]:[];});
     const victimId=victims[0]?.id,to=steps.at(-1)!,line=battleTimeline(role,steps.length,execution,!!victimId,!!options.charge,reduced),from=actor.group.position.clone(),destination=cellToWorld(to.x,to.y,.18),dir=destination.clone().sub(from).setY(0);
+    const points=[from,...steps.map(step=>cellToWorld(step.x,step.y,.18))];
+    const segments=steps.map((_,i)=>({from:points[i],to:points[i+1],direction:points[i+1].clone().sub(points[i]).setY(0).normalize()}));
     const goalFacing=dir.lengthSq()>.001?shortAngle(Math.atan2(dir.x,dir.z)-actor.model.rotation.y):actor.facing;
     if(!execution&&!victimId&&dir.lengthSq()>.001){line.cues.push({kind:'slide',at:.19});line.cues.sort((a,b)=>a.at-b.at);}
     this.boardMarks.landAt(to.x,to.y,!!to.victimId);
     if(execution)this.fx.startAction(from,steps,role);else if(victimId)this.fx.startStrike(role,from,steps);else if(role==='martyr'&&!reduced)this.fx.startMartyrTrail(from,steps);
     this.lastAttack=victimId||execution?{role,victimId,dissolved:false,execution,path:steps.map(p=>({...p}))}:null;
-    return new Promise(finish=>{this.transition={id,role,actor,victim:victims[0]?.actor,victimId,victims,steps:steps.map(p=>({...p})),execution,cues:line.cues,emitted:new Set(),silent:false,impacts:new Set(),restore:actor.rest,from,to:destination,start:performance.now(),duration:line.duration,impact:false,finish,line,publicBeats:options.publicBeats??{captures:[],reveals:[]},beforeRites:this.state.ritual?structuredClone(this.state.ritual):undefined,beforePieces:structuredClone(this.state.pieces),ceremonyCommitted:false,lastProgress:0,startLift:actor.model.position.y,fromFacing:actor.facing,goalFacing,groupKey:`battle/${this.instance}/${++this.actionSerial}`};});
+    return new Promise(finish=>{this.transition={id,role,actor,victim:victims[0]?.actor,victimId,victims,steps:steps.map(p=>({...p})),segments,execution,cues:line.cues,emitted:new Set(),silent:false,impacts:new Set(),restore:actor.rest,from,to:destination,start:performance.now(),duration:line.duration,impact:false,finish,line,publicBeats:options.publicBeats??{captures:[],reveals:[]},beforeRites:this.state.ritual?structuredClone(this.state.ritual):undefined,beforePieces:structuredClone(this.state.pieces),ceremonyCommitted:false,lastProgress:0,startLift:actor.model.position.y,fromFacing:actor.facing,goalFacing,groupKey:`battle/${this.instance}/${++this.actionSerial}`};});
   }
   cancelMove(completed=false){
     const tr=this.transition;this.transition=null;
@@ -418,7 +431,8 @@ export class BoardScene {
       const waiting=tr.victims.find(v=>!v.fracture&&!v.actor.disposed);
       if(waiting)waiting.fracture=this.fx.prepareFracture(waiting.actor.model);
     }
-    const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,step=tr.steps[index],from=index?cellToWorld(tr.steps[index-1].x,tr.steps[index-1].y,.18):tr.from,to=cellToWorld(step.x,step.y,.18),dir=to.clone().sub(from).setY(0).normalize(),actor=tr.actor;
+    const sample=sampleBattle(progress,tr.line,tr.steps.length),index=tr.execution?sample.index:0,actor=tr.actor;
+    const {from,to,direction:dir}=tr.segments[index];
     actor.group.position.lerpVectors(from,to,sample.travel);actor.model.position.y=sample.lift+tr.startLift*(1-smooth(progress/.28));
     if(tr.execution&&!tr.line.reduced&&!tr.silent){
       const focus=smooth(progress/.14)*(1-smooth((progress-.79)/.20));
@@ -428,9 +442,11 @@ export class BoardScene {
     }
     this.boardMarks.setLandingContact(progress,tr.line.plant,tr.line.reduced);
     if(actor.rig){const turn=tr.line.reduced?1:smooth(clamp(progress/.26));poseFigure(actor.rig,sample.pose,tr.fromFacing+shortAngle(tr.goalFacing-tr.fromFacing)*turn);}
-    actor.group.updateMatrixWorld(true);const tip=actor.rig?actor.rig.weapon.localToWorld(new T.Vector3().fromArray(actor.rig.weapon.userData.contact??[0,.3,0])):actor.group.position.clone();
-    const edge=actor.rig&&(tr.role==='guard'||tr.role==='king')
-      ? actor.rig.weapon.localToWorld(new T.Vector3().fromArray(actor.rig.weapon.userData.trailEdge)) : undefined;
+    const weapon=actor.rig?.weapon;
+    weapon?.updateWorldMatrix(true,false);
+    const tip=weapon?new T.Vector3().fromArray(weapon.userData.contact).applyMatrix4(weapon.matrixWorld):actor.group.position;
+    const edge=weapon&&(tr.role==='guard'||tr.role==='king')
+      ? new T.Vector3().fromArray(weapon.userData.trailEdge).applyMatrix4(weapon.matrixWorld) : undefined;
     this.fx.stepAction(progress,actor.group.position,Math.sign(dir.z),tip,index,sample.local,tr.line.reduced,edge,now);
     for(const{cue,index:cueIndex}of consumeCues(tr.cues,tr.emitted,progress)){
       const at=tr.start+cue.at*tr.duration,age=now-at,fresh=age<160&&!document.hidden&&!tr.silent;
@@ -501,7 +517,11 @@ export class BoardScene {
       if(v.actor.rig&&!tr.execution&&v.actor.role!=='unknown')poseFigure(v.actor.rig,retirementPose(v.actor.role,age,tr.line.reduced),v.actor.facing);
       if(progress<discloseAt||!v.actor.model.visible)continue;
       (v.actor.rune.material as T.MeshBasicMaterial).opacity=.25*(1-age);
-      v.actor.model.traverse(o=>{if(o instanceof T.Mesh)for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}const start=tr.execution?0:m.userData.scope==='base'?.58:m.userData.scope==='crown'?.35:.18;m.opacity=1-smooth(clamp((age-start)/(.98-start)));}});
+      for(const m of v.actor.materials){
+        if(!m.transparent||m.depthWrite){m.transparent=true;m.depthWrite=false;m.needsUpdate=true;}
+        const start=tr.execution?0:m.userData.scope==='base'?.58:m.userData.scope==='crown'?.35:.18;
+        m.opacity=1-smooth(clamp((age-start)/(.98-start)));
+      }
     }
     const effectStillPlaying=tr.victims.length>0&&!tr.silent&&this.fx.transients.some(effect=>
       (effect.kind==='fracture'||effect.kind==='unseal')&&effect.start>=tr.start&&now<effect.start+effect.life
@@ -704,13 +724,29 @@ export class BoardScene {
     if(this.actors.get(id)!==actor||actor.disposed)return;actor.disposed=true;actor.group.removeFromParent();this.actors.delete(id);this.disposeGroup(actor.group);
   }
   private disposeGroup(g: T.Object3D) {
-    g.traverse(o => { if (o instanceof T.Mesh || o instanceof T.Line) { if(o instanceof T.InstancedMesh)o.dispose();if(!o.geometry?.userData.shared)o.geometry?.dispose(); const materials = Array.isArray(o.material) ? o.material : [o.material]; for (const m of materials) if (!m.userData.shared && m !== metal && m !== darkMetal && m !== obsidian) { for(const value of Object.values(m))if(value instanceof T.Texture&&!value.userData.shared)value.dispose(); m.dispose(); } } });
+    const geometries=new Set<T.BufferGeometry>(), materials=new Set<T.Material>(), textures=new Set<T.Texture>();
+    g.traverse(o=>{
+      if(!(o instanceof T.Mesh||o instanceof T.Line))return;
+      if(o instanceof T.InstancedMesh)o.dispose();
+      if(!o.geometry.userData.shared)geometries.add(o.geometry);
+      for(const m of Array.isArray(o.material)?o.material:[o.material]){
+        if(!m.userData.shared&&m!==metal&&m!==darkMetal&&m!==obsidian)materials.add(m);
+      }
+    });
+    for(const m of materials)for(const value of Object.values(m)){
+      if(value instanceof T.Texture&&!value.userData.shared)textures.add(value);
+    }
+    geometries.forEach(geometry=>geometry.dispose());
+    materials.forEach(material=>material.dispose());
+    textures.forEach(texture=>texture.dispose());
   }
   destroy() {
     this.cancelMove(); this.dead = true; cancelAnimationFrame(this.frame); this.observer.disconnect(); this.ink.destroy();
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown); this.renderer.domElement.removeEventListener('pointerup', this.pointerUp); this.renderer.domElement.removeEventListener('pointermove', this.pointerMove); this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu);
     this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel);
     this.renderer.domElement.removeEventListener('lostpointercapture', this.pointerCancel);
+    this.fallenWorker?.terminate();
+    this.fallenMeshes.forEach(geometry=>geometry.dispose());this.fallenMeshes.clear();
     this.batches.clear();this.fx.destroy();this.disposeGroup(this.scene); disposeCharacters(); this.environment.dispose();disposeSurfaces(); this.renderer.dispose(); this.renderer.domElement.remove();this.executionShade.remove();
   }
 }

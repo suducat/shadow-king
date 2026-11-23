@@ -157,6 +157,8 @@ export default function App() {
         setRulesMode('ritual');setGameMode(opponent);setDifficulty('master');setHistory([]);setGame(fixture);setViewer('red');setPhase('play');setModal(null);scene.current?.resetCamera();
       },
       loadState:(g:Game,level:Difficulty='omniscient')=>{cancelTurn();scene.current?.resetActors();setGame(g);setRulesMode(modeOf(g));setGameMode('ai');setDifficulty(level);setHistory([]);setViewer('red');setPhase('play');setModal(null);},
+      fallenMeshesReady:()=>scene.current?.fallenMeshesReady,
+      profileFallen:async()=>{const q=await import('./combat-qa');return q.profileFallen(scene.current!);},
       audioProbe:async()=>{const q=await import('./combat-qa');return q.audioProbe();},
       setBatching:(enabled:boolean)=>scene.current?.setBatching(enabled),
       combatFrame:async()=>{const q=await import('./combat-qa');return {...q.combatFrame(scene.current!),audio:sound.stats,audioCues:sound.accepted};},

@@ -17,6 +17,11 @@ export class BattleEffects{
  altar=new T.Group();charges=new Map<string,T.Group>();royalMarks=new Map<string,T.Group>();preview=new T.Group();action:T.Group|null=null;transients:Transient[]=[];
  light=new T.PointLight(PURPLE,0,9,2);active=false;occupied=false;openedAt=-Infinity;private lastRites?:Rites;
  private border:T.Mesh[]=[];private sigils:T.Mesh[]=[];private flow:T.Mesh[]=[];private core:T.Group;
+ private particleTransform=new T.Object3D();
+ private bladeLocal=new T.Vector3();
+ private bladeWorld=new T.Vector3();
+ private chargeRotation=new T.Quaternion();
+ private spreadDirection=new T.Vector3();
  private statePieces:VisiblePiece[]=[];private pending:string|null=null;private mode?:GameMode;private particleBudget=8;
  setQuality(low:boolean){this.particleBudget=low?6:8;}
  constructor(private root:T.Group){
@@ -247,27 +252,43 @@ export class BattleEffects{
  ceremony(kind:'open'|'occupy',now:number){const g=new T.Group();this.root.add(g);ring(g,kind==='open'?1.3:.65,.022,kind==='open'?PURPLE:GOLD,.45);this.push({group:g,start:now,life:kind==='open'?650:550,kind});}
  collapse(now=performance.now(),reduced=false){const g=new T.Group();this.root.add(g);ring(g,1.35,.035,PURPLE,reduced?.2:.5);this.push({group:g,start:now,life:reduced?180:480,kind:'collapse',reduced});}
  tick(now:number,reduced:boolean,actors:Map<string,{group:T.Group}>){
-  const wake=T.MathUtils.smoothstep((now-this.openedAt)/650,0,1);
-  this.border.forEach((m,i)=>(m.material as T.MeshBasicMaterial).opacity=this.active?(i<8?.55:.7)+(reduced?0:Math.sin(now*.0015+i*.15)*.045)*wake:.065);
-  this.sigils.forEach(m=>(m.material as T.MeshBasicMaterial).opacity=this.active?(this.occupied?.65:.4)+(reduced?0:Math.sin(now*.0017)*.055):.055);
-  this.core.rotation.y=reduced?0:this.occupied?Math.sin(now*.0007)*.015:now*.00004;
-  this.flow.forEach((m,i)=>{m.visible=this.active;const t=(i/12+(reduced?0:now*.000035))%1,q=t*4,n=Math.floor(q),f=(q-n)*3,coords=[[-1.5+f,-1.5],[1.5,-1.5+f],[1.5-f,1.5],[-1.5,1.5-f]][n];if(this.occupied){const a=i*Math.PI/6,r=1.48*(1-((reduced?.4:now*.00022)+i/12)%1);m.position.set(Math.sin(a)*r,.18,Math.cos(a)*r);m.rotation.z=-a;}else{m.position.set(coords[0],.18,coords[1]);m.rotation.z=n%2?Math.PI/2:0;}});
-  this.light.visible=this.mode==='ritual';this.light.intensity=this.active?(this.occupied?1.8:1.15)+(reduced?0:Math.sin(wake*Math.PI)*1.2):0;
+  if(this.mode==='ritual'){
+   const wake=T.MathUtils.smoothstep((now-this.openedAt)/650,0,1);
+   this.border.forEach((m,i)=>(m.material as T.MeshBasicMaterial).opacity=this.active?(i<8?.55:.7)+(reduced?0:Math.sin(now*.0015+i*.15)*.045)*wake:.065);
+   this.sigils.forEach(m=>(m.material as T.MeshBasicMaterial).opacity=this.active?(this.occupied?.65:.4)+(reduced?0:Math.sin(now*.0017)*.055):.055);
+   this.core.rotation.y=reduced?0:this.occupied?Math.sin(now*.0007)*.015:now*.00004;
+   this.flow.forEach((m,i)=>{
+    m.visible=this.active;
+    if(!m.visible)return;
+    if(this.occupied){
+     const a=i*Math.PI/6,r=1.48*(1-((reduced?.4:now*.00022)+i/12)%1);
+     m.position.set(Math.sin(a)*r,.18,Math.cos(a)*r);m.rotation.z=-a;
+    }else{
+     const q=((i/12+(reduced?0:now*.000035))%1)*4,n=Math.floor(q),f=(q-n)*3;
+     m.position.set(n===0?-1.5+f:n===1?1.5:n===2?1.5-f:-1.5,.18,
+       n===0?-1.5:n===1?-1.5+f:n===2?1.5:1.5-f);
+     m.rotation.z=n%2?Math.PI/2:0;
+    }
+   });
+   this.light.intensity=this.active?(this.occupied?1.8:1.15)+(reduced?0:Math.sin(wake*Math.PI)*1.2):0;
+  }
   for(const[id,g]of this.charges){
    const actor=actors.get(id),weapon=actor?.group.getObjectByName('rig-weapon');
    if(!actor||!weapon)continue;
    g.position.copy(actor.group.position);g.updateWorldMatrix(true,false);
    const blade=g.getObjectByName('blade')!;
-   blade.position.copy(g.worldToLocal(weapon.localToWorld(new T.Vector3(0,.49,.014))));
+   blade.position.copy(g.worldToLocal(weapon.localToWorld(this.bladeLocal.set(0,.49,.014))));
    weapon.getWorldQuaternion(blade.quaternion);
-   blade.quaternion.premultiply(g.getWorldQuaternion(new T.Quaternion()).invert());
+   blade.quaternion.premultiply(g.getWorldQuaternion(this.chargeRotation).invert());
    const rise=reduced?1:T.MathUtils.smoothstep(now-g.userData.began,0,360);
    blade.scale.set(.076,.42*(.45+.55*rise),.072);
+   if(!reduced)blade.getWorldPosition(this.bladeWorld);
    for(const spark of g.children)if(spark.userData.spark!==undefined){
     const i=spark.userData.spark,t=(now*.0013+i/8)%1,angle=i*2.4+t;
     spark.visible=!reduced;
+    if(reduced)continue;
     spark.position.set(Math.cos(angle)*.73,.12+(i%3)*.24,Math.sin(angle)*.73).lerp(blade.position,t*t);
-    spark.lookAt(blade.getWorldPosition(new T.Vector3()));
+    spark.lookAt(this.bladeWorld);
     spark.scale.set(.75,.75,3.8*(1-t)+.5);
    }
   }
@@ -281,7 +302,7 @@ export class BattleEffects{
      m.position.set(side*.64*age,.34*age,.35);m.rotation.set(-age*.95,side*.8*age,-side*age);
      mat.opacity=.86*(1-T.MathUtils.smoothstep(age,.15,.82));
     }else if(m.name==='unseal-rays'&&m instanceof T.InstancedMesh){
-     const ray=new T.Object3D();
+     const ray=this.particleTransform;
      for(let i=0;i<m.count;i++){
       const angle=i*2.4,r=.33+age*.48;
       ray.position.set(Math.cos(angle)*r,.32+(i%4)*.27+age*.44,Math.sin(angle)*r);
@@ -297,7 +318,7 @@ export class BattleEffects{
      m.position.y+=Math.sin(age*Math.PI)*(.08+.065*i)-age*age*.17;
      m.rotation.set(age*.52*i,age*spread,age*spread*1.7);
      mat.opacity=1-T.MathUtils.smoothstep(age,.43,1);
-    }else if((m.name==='chips'||m.name==='ash')&&m instanceof T.InstancedMesh){const dir=t.direction!,side=new T.Vector3(-dir.z,0,dir.x),dummy=new T.Object3D();for(let i=0;i<m.count;i++){const ash=m.name==='ash',spread=Math.sin(i*2.4)*(ash?.31:.72);dummy.position.copy(dir).multiplyScalar(age*(.24+(i%3)*(ash?.12:.28))).addScaledVector(side,spread*age);dummy.position.y=ash?.25+age*.77+(i%4)*.16:Math.max(.22,.55+(i%4)*.19+Math.sin(age*Math.PI)*.36-age*age*.68);dummy.rotation.set(age*(i+1),i*.7,age*i);const size=(ash?.024:.084)*(1-.65*age);dummy.scale.set(size,size*(ash?.7:1.7),size*.63);dummy.updateMatrix();m.setMatrixAt(i,dummy.matrix);}m.instanceMatrix.needsUpdate=true;mat.opacity=.65*fade;}
+    }else if((m.name==='chips'||m.name==='ash')&&m instanceof T.InstancedMesh){const dir=t.direction!,side=this.spreadDirection.set(-dir.z,0,dir.x),dummy=this.particleTransform;for(let i=0;i<m.count;i++){const ash=m.name==='ash',spread=Math.sin(i*2.4)*(ash?.31:.72);dummy.position.copy(dir).multiplyScalar(age*(.24+(i%3)*(ash?.12:.28))).addScaledVector(side,spread*age);dummy.position.y=ash?.25+age*.77+(i%4)*.16:Math.max(.22,.55+(i%4)*.19+Math.sin(age*Math.PI)*.36-age*age*.68);dummy.rotation.set(age*(i+1),i*.7,age*i);const size=(ash?.024:.084)*(1-.65*age);dummy.scale.set(size,size*(ash?.7:1.7),size*.63);dummy.updateMatrix();m.setMatrixAt(i,dummy.matrix);}m.instanceMatrix.needsUpdate=true;mat.opacity=.65*fade;}
     else if(m.name==='contact-flash'){m.visible=age<.24;mat.opacity=.48*(1-age/.24);m.scale.setScalar(.7+age*1.8);}
     else if(t.reduced&&t.kind==='impact'){mat.opacity=.78*fade;m.scale.setScalar(1);}
     else{mat.opacity=(t.reduced?.3:.5)*fade;m.scale.setScalar(t.kind==='occupy'?1.3-age*.3:1+age*(t.kind==='collapse'?.25:1.05));}});return true;});

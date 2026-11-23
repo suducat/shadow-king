@@ -9,7 +9,7 @@ async function openGame(browser,dir='dist-test',opts={},qa=true){
  await page.addInitScript(preferences=>{
   localStorage.setItem('shadow-king-settings',JSON.stringify(preferences));
   const OriginalWorker=window.Worker;window.__AI_MESSAGES__=[];window.__AI_RESULTS__=[];
-  window.Worker=class extends OriginalWorker{constructor(...args){super(...args);this.addEventListener('message',e=>window.__AI_RESULTS__.push(structuredClone(e.data)));}postMessage(message,...args){window.__AI_MESSAGES__.push(structuredClone(message));return super.postMessage(message,...args);}};
+  window.Worker=class extends OriginalWorker{constructor(...args){super(...args);this.addEventListener('message',e=>{if(Number.isInteger(e.data?.id))window.__AI_RESULTS__.push(structuredClone(e.data));});}postMessage(message,...args){window.__AI_MESSAGES__.push(structuredClone(message));return super.postMessage(message,...args);}};
  },preferences);
  await page.goto('http://shadow-king.test/');if(qa)await page.waitForFunction(()=>window.__SK_QA__);else await page.evaluate(()=>document.fonts.ready);return{page,context,errors};
 }

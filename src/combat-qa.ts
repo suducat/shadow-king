@@ -95,3 +95,18 @@ export async function audioProbe(){
  const max=s.stats,b=await ctx.startRendering();await Promise.resolve();let peak=0,energy=0,nonfinite=0;for(let c=0;c<2;c++)for(const v of b.getChannelData(c)){peak=Math.max(peak,Math.abs(v));energy+=v*v;if(!Number.isFinite(v))nonfinite++;}
  return{accepted,duplicate,afterCancel,max,finished:s.stats,peak,rms:Math.sqrt(energy/(2*b.length)),nonfinite};
 }
+
+export function profileFallen(scene:BoardScene){
+ const times=[];
+ const captures:Game['captures']=[];
+ for(const [side,role] of [['blue','guard'],['blue','guard'],['blue','martyr'],['blue','martyr'],['red','king'],['red','guard'],['red','guard'],['red','martyr'],['red','martyr']] as const){
+  captures.push({side,role,by:side==='red'?'blue':'red',ply:1,at:'A1'});
+  const start=performance.now();
+  scene.setFallen(captures);
+  const ms=performance.now()-start;
+  const mesh=scene.fallen.children.at(-1) as T.Mesh;
+  times.push({side,role,ms,geometry:mesh.geometry.uuid,triangles:(mesh.geometry.index?.count??mesh.geometry.attributes.position.count)/3});
+ }
+ scene.setFallen([]);
+ return times;
+}
