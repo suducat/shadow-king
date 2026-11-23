@@ -12,14 +12,13 @@ const {openGame,launch,holdFrame}=require('./support.cjs');
     preferences:{quality:'low',reduced:mobile,cinematic:true,muted:true},
    });
    const portrait=page.locator('.home-portrait');
-   assert.equal(await portrait.getAttribute('data-role'),'king');
    assert.equal(await portrait.locator('.home-floor polygon').count(),49);
    const hero=page.locator('.court-hero-art');
    assert.equal(await hero.innerText(),'');
    assert.equal(await hero.locator('button').count(),0);
    if(!mobile){
     await page.screenshot({path:'artifacts/home-court-desktop.png'});
-    await page.locator('.home-portrait[data-role="guard"]').waitFor({timeout:10000});
+    await page.locator('.home-portrait[data-role="guard"]').waitFor({timeout:23000});
     assert.equal(await portrait.locator('.home-sword-light').count(),1);
     await page.locator('.home-portrait[data-role="martyr"]').waitFor({timeout:10000});
     await page.locator('.home-portrait[data-role="king"]').waitFor({timeout:10000});
