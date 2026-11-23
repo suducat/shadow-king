@@ -16,7 +16,19 @@ test('execution captures two in order in exactly one turn, metadata follows actu
 for(const role of ['king','guard'] as const)test(`execution stops immediately on first-step ${role} victory`,()=>{let g=ready();const victim=role==='king'?'blue-3':'blue-0';g=put(put(g,victim,3,3),'blue-1',3,2);if(role==='guard')g=removeOthers(g,'blue','guard',victim);const next=act(g,{id:'red-0',x:3,y:2,kind:'execute'});assert.equal(next.result?.reason,role);assert.equal(next.pieces.find(p=>p.id==='red-0')!.y,3);assert.ok(next.pieces.some(p=>p.id==='blue-1'));assert.equal(next.lastAction!.steps.length,1);});
 test('last martyr opens rite and reveals king, never starts occupation in trigger action',()=>{for(const inside of [false,true]){const g=riteOpening(inside),next=move(g,'red-0',3,2);assert.equal(next.result,null);assert.equal(next.ritual!.blue.phase,'open');assert.equal(next.pieces.find(p=>p.id==='blue-3')!.revealed,true);assert.equal(viewFor(next,'red').find(p=>p.id==='blue-3')!.role,'king');}});
 test('king already inside still needs own legal action, then a FULL opponent reply',()=>{let g=move(riteOpening(true),'red-0',3,2);g=move(g,'blue-0',0,1);assert.equal(g.result,null);assert.equal(g.ritual!.blue.phase,'occupied');g=move(g,'red-2',2,5);assert.deepEqual(g.result,{winner:'blue',reason:'ritual'});assert.equal(g.ritual!.blue.phase,'completed');});
-test('king outside must enter altar and survives reply to win',()=>{let g=move(riteOpening(),'red-0',3,2);g=put(g,'blue-3',4,1);g=move(g,'blue-3',4,2);assert.equal(g.ritual!.blue.phase,'occupied');assert.equal(g.result,null);g=move(g,'red-2',2,5);assert.equal(g.result?.reason,'ritual');});
+test('altar entry wins on the opposing reply with no follow-up action',()=>{
+ let g=move(riteOpening(),'red-0',3,2);g=put(g,'blue-3',4,1);
+ const occupied=move(g,'blue-3',4,2);
+ assert.equal(occupied.ritual!.blue.phase,'occupied');
+ assert.equal(occupied.turn,'red');
+ assert.equal(occupied.result,null);
+ const settled=move(occupied,'red-2',2,5);
+ assert.deepEqual(settled.result,{winner:'blue',reason:'ritual'});
+ assert.equal(settled.ply,occupied.ply+1);
+ assert.equal(settled.events!.filter(e=>e.kind==='rite-complete').at(-1)?.ply,settled.ply);
+ assert.deepEqual(allActions(settled),[]);
+ assert.equal(move(settled,'blue-3',4,3),settled);
+});
 test('king capture and final-guard capture during reply take priority over rite success',()=>{for(const role of ['king','guard'] as const){let g=move(riteOpening(true),'red-0',3,2);g=move(g,'blue-0',0,1);g=put(g,'red-0',4,4);if(role==='guard'){g=put(g,'blue-0',4,3);g=put(g,'blue-3',2,2);g=removeOthers(g,'blue','guard','blue-0');}g=move(g,'red-0',4,3);assert.deepEqual(g.result,{winner:'red',reason:role});}});
 test('execution can open rite at step one and kill revealed king at step two',()=>{let g=ready();g=put(put(g,'blue-1',3,3),'blue-3',3,2);g=removeOthers(g,'blue','martyr','blue-1');const next=act(g,{id:'red-0',x:3,y:2,kind:'execute'});assert.equal(next.ritual!.blue.phase,'open');assert.deepEqual(next.result,{winner:'red',reason:'king'});assert.equal(next.captures.length-g.captures.length,2);});
 test('charged guards can be captured normally and charge loss is recorded',()=>{let g=ready();g.turn='blue';g=put(g,'blue-0',3,3);g=move(g,'blue-0',3,4);assert.ok(!g.pieces.some(p=>p.id==='red-0'));assert.equal(g.captures.at(-1)!.charged,true);assert.ok(g.events!.some(e=>e.kind==='charged-captured'));});

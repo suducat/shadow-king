@@ -14,7 +14,7 @@ const {launch,openGame}=require('./support.cjs');
   assert.equal(await page.getByText('什么是祭典模式',{exact:true}).count(),0);
   await page.getByRole('button',{name:/祭典模式/}).click();
   await page.getByText('什么是祭典模式').click();
-  await page.getByText(/死士全灭只会开启祭台/).waitFor();
+  await page.getByText(/限制单靠献祭取胜/).waitFor();
   await page.getByRole('button',{name:/经典模式/}).click();
   assert.equal(await page.getByText('什么是祭典模式',{exact:true}).count(),0);
   await page.evaluate(()=>window.__SK_QA__.loadRitualFixture('counter'));

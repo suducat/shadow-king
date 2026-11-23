@@ -28,6 +28,18 @@ const report={checks:[],errors:[]},mark=s=>{report.checks.push(s);console.log('P
  await fixture('opening');await pointer(3,3,.8);await pointer(3,2);await ack();assert.equal((await snap()).game.result,null);await hand('blue');s=await snap();assert.equal(s.rendered.find(p=>p.id==='blue-3').role,'king');assert.equal(s.game.ritual.blue.phase,'open');
  await key(0,0);await key(0,1);await hand('red');assert.equal((await snap()).game.ritual.blue.phase,'occupied');await key(2,6);await key(2,5);await page.waitForSelector('.ending-ritual');assert.equal((await snap()).game.result.winner,'blue');assert.equal(await page.locator('[data-cinematic=ritual]').count(),1);assert.equal(await page.locator('.result-copy h1').innerText(),'祭典登临');await page.screenshot({path:path.join(root,'artifacts/rite-victory.png')});
  mark('最后死士触发王公开；王已在祭台仍须己方行动，再守过敌方回应；独立祭典结算');
+ for(const capture of [false,true]){
+  await fixture('altar-entry');
+  await key(4,5);await key(4,4);await hand('blue');
+  const occupied=await snap();assert.equal(occupied.game.ritual.red.phase,'occupied');assert.equal(occupied.game.result,null);
+  await key(1,1);await key(capture?1:2,capture?2:1);
+  if(capture)await page.waitForSelector('.reveal-card');
+  await page.waitForSelector('.ending-ritual');
+  const result=await snap();assert.deepEqual(result.game.result,{winner:'red',reason:'ritual'});
+  assert.equal(result.game.ply,occupied.game.ply+1);
+  assert.equal(await page.locator('.handoff-screen,.reveal-card').count(),0);
+ }
+ mark('王实际走入祭台；普通回应和吃子回应均自动结算，不再交接或等待确认');
  await fixture('counter');await pointer(4,4,.8);await page.getByRole('button',{name:'斩杀',exact:true}).click();await ack();await page.waitForSelector('.ending-king');s=await snap();assert.equal(s.game.result.winner,'red');assert.equal(s.game.lastAction.steps.length,1);assert.equal(s.game.pieces.find(p=>p.id==='red-0').y,3);assert.ok(s.game.pieces.some(p=>p.id==='blue-0'));
  mark('回应回合斩杀祭台王：弑王优先，第二格不执行、不误删');
  await fixture('ai-execution','ai');await page.waitForFunction(()=>window.__SK_QA__.snapshot().reveal,null,{timeout:60000});s=await snap();assert.equal(s.game.lastAction.kind,'execute');assert.equal(s.ai.fallback,false);assert.equal(s.game.lastAction.steps.length,2);assert.equal(s.game.pieces.find(p=>p.id==='blue-0').executionUsed,true);await ack();await ack();await page.waitForSelector('.ending-king');assert.equal((await snap()).game.result.winner,'blue');

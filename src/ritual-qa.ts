@@ -1,5 +1,5 @@
 import {createGame,startGame,type Game,type Side} from './game';
-export type RitualFixture='charge'|'ready'|'empty'|'one-step'|'opening'|'counter'|'ai-execution'|'edge'|'execute-open'|'purge'|'single';
+export type RitualFixture='charge'|'ready'|'empty'|'one-step'|'opening'|'counter'|'ai-execution'|'edge'|'execute-open'|'purge'|'single'|'altar-entry';
 export function ritualFixture(name:RitualFixture):Game{
  let g=createGame('ritual');
  const put=(id:string,x:number,y:number)=>{g={...g,pieces:g.pieces.map(p=>p.id===id?{...p,x,y}:p)};};
@@ -10,6 +10,11 @@ export function ritualFixture(name:RitualFixture):Game{
  if(name==='one-step'){put('blue-2',2,0);put('red-2',3,1);}
  if(name==='opening'){
   put('blue-0',0,0);put('blue-2',2,0);put('blue-1',3,2);put('blue-3',4,3);eliminate('blue','martyr','blue-1');
+ }
+ if(name==='altar-entry'){
+  put('red-3',4,5);put('blue-0',1,1);put('red-2',1,2);eliminate('red','martyr');
+  g.ritual!.red={phase:'open',openedPly:1};
+  g.pieces=g.pieces.map(p=>p.id==='red-3'?{...p,revealed:true}:p);
  }
  if(name==='counter'){
   put('red-0',4,4);put('blue-3',4,3);put('blue-0',4,2);eliminate('blue','martyr');g.ritual!.blue={phase:'occupied',openedPly:0,occupiedPly:1};g.pieces=g.pieces.map(p=>p.id==='blue-3'?{...p,revealed:true}:p);

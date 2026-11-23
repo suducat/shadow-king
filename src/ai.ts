@@ -9,11 +9,11 @@ export type Difficulty=StandardDifficulty|'omniscient';
 export const AI_BUILD_ID='v0.9.0';
 export const OMNISCIENT_NOTICE='全知者能够看见你的全部棋子身份。你仍无法看见它尚未公开的身份。';
 export const DIFFICULTIES:Record<Difficulty,{name:string;title:string;label:string;description:string}>={
- easy:{name:'棋侍',title:'初识棋道',label:'简单',description:'偏爱吃子，适合刚学规则的玩家。'},
- normal:{name:'影谋',title:'藏锋于影',label:'普通',description:'会护住王和最后一名影卫，也会看一步反击。'},
- hard:{name:'诡相',title:'落子为饵',label:'困难',description:'从走法猜身份，会争中央，也会为斩杀做准备。'},
- master:{name:'无冕者',title:'执掌命运',label:'大师',description:'会比较多种身份假设，提前几步看攻防。'},
- omniscient:{name:'全知者',title:'帷幕之外',label:'终极挑战',description:'看得见你的全部身份，会针对王和最后一名影卫进攻。'},
+ easy:{name:'棋侍',title:'初识棋道',label:'简单',description:'基础局面评分与轻量判断，行动直接，适合熟悉规则。'},
+ normal:{name:'影谋',title:'藏锋于影',label:'普通',description:'结合公开身份数量与对手回应，兼顾攻防与献祭风险。'},
+ hard:{name:'诡相',title:'落子为饵',label:'困难',description:'约束身份推理与多回合前瞻，提前争夺祭台、规划斩杀。'},
+ master:{name:'无冕者',title:'执掌命运',label:'大师',description:'核算完整身份后验与祭典回应，权衡不可逆风险与多回合战术。'},
+ omniscient:{name:'全知者',title:'帷幕之外',label:'终极挑战',description:'全身份透视与独立深度搜索。在它眼中，没有秘密。'},
 };
 export const AI_RULES={id:'shadow-king-standard-v1',...CONFIG,roles:{king:1,guard:3,martyr:3}} as const;
 export type PublicAction={id:string;side:Side;from:{x:number;y:number};to:{x:number;y:number};captured?:Role;kind?:GameAction['kind']};
