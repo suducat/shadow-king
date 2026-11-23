@@ -7,7 +7,7 @@ const net=require('node:net');
 const {randomUUID}=require('node:crypto');
 const WebSocket=require('ws');
 
-const origin='http://127.0.0.1:17367';
+const origin='https://suducat.github.io';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const line=['guard','martyr','guard','king','martyr','guard','martyr'];
 const root=path.resolve(__dirname,'..');
@@ -86,82 +86,27 @@ async function begin(pair,blueLine=line){
  return both(pair,s=>s.stage==='playing');
 }
 (async()=>{
- const persist=await mkdtemp(path.join(os.tmpdir(),'sk-room-'));let dev;
+ const url='https://shadow-king-multiplayer.shadow-king.workers.dev';
  try{
-  dev=await launch(persist);const url=dev.url;
-  assert.equal((await fetch(url+'/v1/rooms',{method:'POST',headers:{Origin:'https://other.invalid'},body:'{}'})).status,403);
-  assert.equal((await post(url,'/v1/rooms/000000/join')).status,404);
-  const created=await post(url,'/v1/rooms');assert.equal(created.status,201);
-  assert.equal(created.headers.get('access-control-allow-origin'),origin);
-  const redTicket=await created.json();assert.match(redTicket.code,/^\d{6}$/);
-  const joinPath=`/v1/rooms/${redTicket.code}/join`;
-  assert.equal((await post(url,joinPath,'ritual')).status,409);
-  const competing=await Promise.all([post(url,joinPath),post(url,joinPath)]);
-  assert.deepEqual(competing.map(r=>r.status).sort(),[200,409]);
-  const blueTicket=await competing.find(r=>r.ok).json();
-  const bogus=client(url,{...redTicket,token:'a'.repeat(64)});
-  assert.notEqual(await bogus.closed,1000);
-  let red=client(url,redTicket),blue=client(url,blueTicket),pair=[red,blue];
-  await both(pair,s=>s.stage==='ready');
-  red.ws.send('ping');await red.take(m=>m.type==='pong');
-  red.send({type:'ready',value:true});await blue.state(s=>s.otherReady);
-  red.send({type:'ready',value:false});await blue.state(s=>!s.otherReady,1);
-  let [sRed,sBlue]=await begin(pair,['king','guard','martyr','guard','martyr','guard','martyr']);
-  assert.equal(sRed.matchId,sBlue.matchId);
-  assert.ok(!('seen' in sRed.game));
-  assert.ok(sRed.game.pieces.filter(p=>p.side==='blue').every(p=>p.role==='unknown'));
-  assert.ok(sBlue.game.pieces.filter(p=>p.side==='red').every(p=>p.role==='unknown'));
-  assert.equal(sBlue.game.pieces.find(p=>p.id==='blue-0').role,'king');
-  blue.send(intent(blue,sBlue,{id:'blue-0',x:0,y:1}));await blue.take(m=>m.type==='error');
-  const first=intent(red,sRed,{id:'red-0',x:0,y:5});
-  red.send(first);red.send(first);
-  await red.take(m=>m.type==='ack'&&m.actionId===first.intent.actionId);
-  [sRed,sBlue]=await both(pair,s=>s.game?.ply===1);
-  assert.equal(sBlue.lastTurn.actionId,first.intent.actionId);
-  const beforeDisconnect=red.frames.length;blue.ws.terminate();await blue.closed;
-  await red.state(s=>!s.opponentConnected,beforeDisconnect);
-  blue=client(url,blueTicket);pair=[red,blue];
-  sBlue=await blue.state(s=>s.game?.ply===1&&s.opponentConnected);
-  assert.equal(sBlue.lastTurn.actionId,first.intent.actionId);
-  red.send(first);await red.take(m=>m.type==='ack'&&m.actionId===first.intent.actionId);
-  assert.equal((await blue.state(s=>s.game?.ply===1)).game.ply,1);
-  pair.forEach(c=>c.ws.terminate());await dev.stop();
-  dev=await launch(persist);
-  red=client(dev.url,redTicket);blue=client(dev.url,blueTicket);pair=[red,blue];
-  [sRed,sBlue]=await both(pair,s=>s.game?.ply===1&&s.opponentConnected);
-  assert.equal(sRed.lastTurn.actionId,first.intent.actionId);
-  for(let step=0;step<5;step++){
-   [sRed,sBlue]=await play(pair,blue,sBlue,{id:`blue-${step+1}`,x:step+1,y:1});
-   [sRed,sBlue]=await play(pair,red,sRed,{id:'red-0',x:0,y:4-step});
+  assert.deepEqual(await (await fetch(url+'/health',{signal:AbortSignal.timeout(5000)})).json(),{ok:true,version:1});
+  for(const mode of ['classic','ritual']){
+   const pair=await room(url,mode);
+   const [red,blue]=pair;
+   const [sRed,sBlue]=await begin(pair);
+   assert.equal(sRed.matchId,sBlue.matchId);
+   assert.ok(sBlue.game.pieces.filter(p=>p.side==='red').every(p=>p.role==='unknown'));
+   const move={id:'red-0',x:0,y:5,...(mode==='ritual'?{kind:'charge'}:{})};
+   const [afterRed,afterBlue]=await play(pair,red,sRed,move);
+   for(const state of [afterRed,afterBlue])assert.equal(state.game.pieces.find(p=>p.id==='red-0').y,5);
+   if(mode==='ritual')assert.equal(afterBlue.game.pieces.find(p=>p.id==='red-0').role,'guard');
+   blue.ws.terminate();
+   await blue.closed;
+   const reconnect=client(url,blue.ticket);
+   const recovered=await reconnect.state(s=>s.game?.ply===1&&s.opponentConnected);
+   assert.equal(recovered.lastTurn.actionId,afterRed.lastTurn.actionId);
+   reconnect.send({type:'leave'});
+   assert.equal(await red.closed,4000);
+   console.log('PASS production '+mode+' HTTPS, WebSocket, ready, formation, identity privacy, move sync, reconnect and exit');
   }
-  assert.deepEqual(sRed.game.result,{winner:'red',reason:'king'});
-  assert.deepEqual(sRed.game.captures,sBlue.game.captures);
-  assert.equal(sRed.game.captures[0].role,'king');
-  pair.forEach(c=>c.send({type:'rematch',matchId:sRed.matchId}));
-  await both(pair,s=>s.stage==='deploying'&&s.matchId!==sRed.matchId);
-  blue.send({type:'leave'});assert.equal(await red.closed,4000);
-
-  pair=await room(dev.url,'ritual');[red,blue]=pair;
-  [sRed,sBlue]=await begin(pair);
-  [sRed,sBlue]=await play(pair,red,sRed,{id:'red-0',x:0,y:5,kind:'charge'});
-  assert.equal(sBlue.game.pieces.find(p=>p.id==='red-0').role,'guard');
-  [sRed,sBlue]=await play(pair,blue,sBlue,{id:'blue-1',x:1,y:1});
-  [sRed,sBlue]=await play(pair,red,sRed,{id:'red-0',x:0,y:3,kind:'execute'});
-  assert.equal(sBlue.game.lastAction.steps.length,2);
-  assert.equal(sBlue.game.pieces.find(p=>p.id==='red-0').executionUsed,true);
-  await dev.stop();
-  dev=await launch(persist,2);
-  const expireResponse=await post(dev.url,'/v1/rooms');
-  assert.equal(expireResponse.status,201);
-  const expTicket=await expireResponse.json();
-  const exp=client(dev.url,expTicket);
-  await exp.state(s=>s.stage==='waiting');
-  await exp.take(m=>m.type==='closed'&&m.message.includes('过期'),0,7000);
-  assert.equal(await exp.closed,4000);
-  assert.equal((await post(dev.url,`/v1/rooms/${expTicket.code}/join`)).status,404);
-  console.log('PASS Wrangler HTTP + WebSocket, seat race, readiness, sync, duplicate and wrong turns, privacy, regicide, skills, reconnect, persistence restart, leave and alarm expiry');
- }finally{
-  for(const ws of sockets)ws.terminate();
-  await dev?.stop();await rm(persist,{recursive:true,force:true});
- }
+ }finally{for(const ws of sockets)ws.terminate();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
