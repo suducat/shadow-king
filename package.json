@@ -35,16 +35,20 @@
     "record:combat": "node scripts/v07-reel.cjs",
     "test:combat:background": "node tests/combat-background.cjs",
     "test:rendering": "tsx --test tests/rendering.test.ts tests/quality.test.ts",
-    "test:rendering:browser": "node tests/rendering-browser.cjs"
+    "test:rendering:browser": "node tests/rendering-browser.cjs",
+    "typecheck:multiplayer": "tsc -p server/cloudflare/tsconfig.json",
+    "dev:multiplayer": "wrangler dev --config server/cloudflare/wrangler.jsonc",
+    "deploy:multiplayer": "wrangler deploy --config server/cloudflare/wrangler.jsonc",
+    "test:multiplayer": "node tests/cloudflare-integration.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
-    "peerjs": "^1.5.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261123.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.180.0",
@@ -52,6 +56,8 @@
     "playwright": "^1.65.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "wrangler": "^4.166.0",
+    "ws": "^8.23.0"
   }
 }

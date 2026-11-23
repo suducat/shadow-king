@@ -5,14 +5,14 @@ import type {GameMode} from './ritual';
 import type {Side} from './game';
 
 type Props={rule:GameMode;room:CourtSession['state']|null;
- begin:(side:Side,code?:string)=>void;toggle:()=>void;cancel:()=>void;back:()=>void};
+ begin:(side:Side,code?:string)=>void;toggle:()=>void;cancel:()=>void;reconnect:()=>void;back:()=>void};
 
-export function CourtSummons({rule,room,begin,toggle,cancel,back}:Props){
+export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back}:Props){
  const [join,setJoin]=useState(false);
  const [secret,setSecret]=useState('');
  const [copied,setCopied]=useState('');
  const waiting=room?.stage==='waiting',ready=room?.stage==='ready';
- const busy=room?.stage==='connecting'||room?.stage==='opening';
+ const busy=room?.stage==='connecting'||room?.stage==='opening'||room?.stage==='reconnecting';
  function enter(e:FormEvent){e.preventDefault();if(/^\d{6}$/.test(secret)&&!busy)begin('blue',secret);}
  const title=ready?'双王就位':room?.side==='red'?'静候应邀者':join?'应邀入局':'王庭邀约';
  return <section className="mode-panel court-summons" aria-label="王庭邀约">
@@ -42,7 +42,8 @@ export function CourtSummons({rule,room,begin,toggle,cancel,back}:Props){
   {busy&&<p role="status" className="court-message">{room.message||(room.side==='blue'?'正在回应邀约……':'正在发出邀约……')}</p>}
   {room?.stage==='error'&&<>
    <p role="alert" className="court-message court-error">{room.message}</p>
-   {room.side==='red'&&<button className="secondary" onClick={()=>begin('red')}>重新发起邀约</button>}
+   {room.reconnectable&&<button className="secondary" onClick={reconnect}>重新连接</button>}
+   {room.side==='red'&&!room.reconnectable&&<button className="secondary" onClick={()=>begin('red')}>重新发起邀约</button>}
   </>}
   {ready&&<div className="court-ready">
    <p role="status" className="court-message">{room.starting?'棋局启幕':'应邀者已至'}</p>

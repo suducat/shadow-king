@@ -1,0 +1,17 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "shadow-king-multiplayer",
+  "main": "index.ts",
+  "compatibility_date": "2026-05-01",
+  "workers_dev": true,
+  "vars": { "ALLOWED_ORIGINS": "https://suducat.github.io" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "CourtRoom" },
+      { "name": "LIMITS", "class_name": "InviteLimit" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CourtRoom", "InviteLimit"] }
+  ]
+}
