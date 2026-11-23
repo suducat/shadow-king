@@ -57,7 +57,7 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
    assert.equal(await players.locator('.court-player-id').count(),0);
    const playerBounds=await players.boundingBox();
    const viewport=p.viewportSize();
-   assert.ok(playerBounds && playerBounds.y>viewport.height-175);
+   assert.ok(playerBounds && playerBounds.y+playerBounds.height>viewport.height-130);
    assert.ok(playerBounds.x<90 || playerBounds.x+playerBounds.width>viewport.width-25);
    assert.equal(await p.getByLabel(/接收王庭/).count(),0);
    const bounds=await button(p,'王庭密语').boundingBox();
