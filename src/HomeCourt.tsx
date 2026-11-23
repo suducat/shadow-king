@@ -90,7 +90,7 @@ export function HomeCourt({reduced}:{reduced:boolean}){
  const light=useId();
  useEffect(()=>{
   if(reduced)return;
-  const timer=setTimeout(()=>setActive(value=>(value+1)%chapters.length),6500);
+  const timer=setTimeout(()=>setActive(value=>(value+1)%chapters.length),5500);
   return ()=>clearTimeout(timer);
  },[active,reduced]);
  return <section className="court-hero-art" aria-label="永夜王庭角色演出">

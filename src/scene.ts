@@ -606,6 +606,20 @@ export class BoardScene {
     const cell = resolvePick(intersectBoard(this.ray.ray),body?.x!==undefined?{x:body.x,y:body.y}:null,this.state.legal,this.state.selected);
     if (cell) { this.lastHit = { ...cell, source: body?.x !== undefined ? 'body' : 'cell' }; this.onCell(cell.x, cell.y); }
   };
+  hudProjection(){
+    this.camera.updateMatrixWorld(true);
+    const rect=this.renderer.domElement.getBoundingClientRect(),point=new T.Vector3();
+    const screen=()=>{point.project(this.camera);return{x:rect.left+(point.x+1)*rect.width/2,y:rect.top+(1-point.y)*rect.height/2};};
+    return {
+      actor:(id:string,height:number)=>{
+        const actor=this.actors.get(id);
+        if(!actor)return null;
+        point.copy(actor.group.position);point.y+=height;
+        return screen();
+      },
+      cell:(x:number,y:number,height=.14)=>{point.set(x-3,height,y-3);return screen();},
+    };
+  }
   projectActor(id:string,height=1.4){const actor=this.actors.get(id);if(!actor)return null;this.camera.updateMatrixWorld(true);const v=actor.group.position.clone();v.y+=height;v.project(this.camera);const r=this.renderer.domElement.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}
   projectCell(x: number, y: number, height = .14) {
     this.camera.updateMatrixWorld(true);
@@ -620,7 +634,14 @@ export class BoardScene {
     this.applyQuality();
     if(devicePixelRatio!==this.displayDensity)this.resize();
     if(this.layoutSuspended)return;
-    const now = performance.now(), dt = Math.min((now - this.last) / 1000, .05); this.last = now;
+    const now = performance.now();
+    const cameraMoving=this.angle!==this.desiredAngle||this.zoom!==this.desiredZoom;
+    const animating=!!this.transition||!!this.burst||this.fx.transients.length>0||this.ink.active;
+    // Settle static previews at the existing idle cadence. All active cues
+    // still run on every frame using their absolute timestamps.
+    if(!this.dirty&&!cameraMoving&&!animating&&(this.state.reduced||now-this.lastRender<1000/QUALITY[this.quality].idleFps))return;
+    const elapsed=(now-this.last)/1000,dt=Math.min(elapsed,.05);
+    this.last=now;
     // Full privacy/result covers have no interactive 3D content. Stop their
     // hidden GPU work so DOM/SVG ending animation can use the compositor freely.
     if(this.state.viewer===null&&this.state.active){this.audioQueue=[];this.lastCamera=now;this.dirty=false;return;}
@@ -680,7 +701,7 @@ export class BoardScene {
       actor.group.position.lerp(actor.target,this.state.reduced?1:1-Math.exp(-dt*10));const selectedLift=!this.state.reduced&&actor.role!=='unknown'&&this.state.selected===id ? .032 : 0;
       actor.model.position.y=T.MathUtils.damp(actor.model.position.y,selectedLift,22,dt);
       if(actor.rig){const pose=neutralPose(),charged=actor.role==='guard'&&(!!piece?.charging||this.state.pendingCharge===id);if(!this.state.reduced&&actor.role!=='unknown'){pose.heave=Math.sin(now*.0013+actor.target.x)*.003;pose.capeDrag=Math.sin(now*.0011+actor.target.x)*.009;}if(charged){drawStance(pose);}poseFigure(actor.rig,pose,actor.facing);}
-      actor.rune.rotation.z += this.state.reduced ? 0 : dt * .12;
+      actor.rune.rotation.z += this.state.reduced ? 0 : Math.min(elapsed,.1) * .12;
     }
     const actionTime=import.meta.env.MODE==='test'&&this.debugActionProgress!==null&&this.transition?this.transition.start+this.transition.duration*this.debugActionProgress:now;
     this.stepMove(actionTime);
@@ -708,7 +729,7 @@ export class BoardScene {
       });
       if (age > 1.1) { this.root.remove(this.burst.group); this.disposeGroup(this.burst.group); this.burst = null; }
     }
-    if (!this.state.reduced) this.particles.rotation.y += dt * .007;
+    if (!this.state.reduced) this.particles.rotation.y += Math.min(elapsed,.1) * .007;
     const ready=String(this.measuredWidth>0&&this.measuredHeight>0&&Math.abs(this.angle-this.desiredAngle)<.0008&&Math.abs(this.zoom-this.desiredZoom)<.001);
     if(this.renderer.domElement.dataset.ready!==ready)this.renderer.domElement.dataset.ready=ready;
     const moving=!!this.transition||!!this.burst||this.fx.transients.length>0||ready==='false';

@@ -5,11 +5,11 @@ import {evaluateStrategy,actionOrder,habitCost,attacks} from './strategy-eval';
 import type {Observation,StandardDifficulty,SearchOptions,Decision,Action} from './ai';
 import {forcedRiteLoss} from './rite-proof';
 const rngFor=(seed:number)=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-export function decideStrategic(o:Observation,difficulty:StandardDifficulty,options:SearchOptions={}):Decision{
- const start=performance.now(),rng=rngFor(options.seed??1),belief=inferIdentities(o);
- const maxMillis=options.maxMillis??({easy:20,normal:100,hard:220,master:650}[difficulty]),limit=start+maxMillis,budget=options.nodeBudget??({easy:120,normal:600,hard:1800,master:5000}[difficulty]);let nodes=0,depth=1,rounds=0,inferenceStates=0;
+export function decideStrategic(o:Observation,difficulty:Exclude<StandardDifficulty,'easy'>,options:SearchOptions={}):Decision{
+ const start=performance.now(),rng=rngFor(options.seed??1),belief=inferIdentities(o,difficulty!=='normal');
+ const maxMillis=options.maxMillis??({normal:105,hard:310,master:880}[difficulty]),limit=start+maxMillis,budget=options.nodeBudget??({normal:650,hard:2600,master:8000}[difficulty]);let nodes=0,depth=1,rounds=0,inferenceStates=0;
  const first=o.history[0];const style=difficulty==='master'?(first?(first.from.x*7+first.to.x+first.to.y)%4:(options.seed??1)%4):0;
- const worlds=sampleWorlds(belief,{easy:1,normal:3,hard:5,master:8}[difficulty],rng),games=worlds.map(w=>({g:worldGame(o,belief,w),weight:w.weight,key:w.roles.join('/')}));
+ const worlds=sampleWorlds(belief,{normal:3,hard:5,master:8}[difficulty],rng),games=worlds.map(w=>({g:worldGame(o,belief,w),weight:w.weight,key:w.roles.join('/')}));
  const legal=allActions(games[0].g).filter(a=>!options.disableExecution||!a.kind),expired=()=>nodes>=budget||performance.now()>=limit;
  const step=(g:Game,a:Action)=>{nodes++;return g.mode==='ritual'?resolveRitual(g,a,true):act(g,a);};
  const done=(a:Action|null):Decision=>({action:a,nodes,samples:games.length,algorithm:`risk-aware joint belief + exact rite response proof + ${difficulty} search`,elapsed:performance.now()-start,diagnostics:{depth,rounds,worlds:belief.worlds.length,entropy:belief.entropy,style,inferenceStates}});
@@ -64,7 +64,6 @@ export function decideStrategic(o:Observation,difficulty:StandardDifficulty,opti
   root.value=combined(root,total,weight)-root.cost+(root.a.kind==='charge'?-35:0);
  }
  rank.sort((a,b)=>b.value-a.value);let best=rank[0].a;
- if(difficulty==='easy'){const near=rank.filter(r=>r.value>=rank[0].value-110);return done(near[Math.floor(rng()*Math.min(5,near.length))].a);}
  let candidates=rank.slice(0,difficulty==='normal'?6:difficulty==='hard'?9:12);
  const tree=(g:Game,remaining:number,alpha:number,beta:number):number=>{
   if(g.result||remaining===0||expired())return value(g);
@@ -84,12 +83,20 @@ export function decideStrategic(o:Observation,difficulty:StandardDifficulty,opti
   const totals=new Map(active.map(r=>[r,0])),weights=new Map(active.map(r=>[r,0]));let completed=0;
   for(const sample of games){const partial=new Map<typeof candidates[number],{value:number;ongoing:boolean}>();
    for(const root of active){if(expired())break;const next=step(sample.g,root.a),settled=!!root.terminal?.settled.has(sample.key);partial.set(root,{value:settled?0:tree(next,targetDepth-1,-Infinity,Infinity),ongoing:!settled});}
-   if(partial.size!==active.length)break;
+   if(expired()||partial.size!==active.length)break;
    for(const[root,result]of partial){totals.set(root,totals.get(root)!+result.value*sample.weight);if(result.ongoing)weights.set(root,weights.get(root)!+sample.weight);}completed++;
    if(expired())break;
   }
-  if(expired()||completed!==games.length)break;rounds+=completed;depth=targetDepth;
-  const scores=active.map(r=>({a:r.a,value:combined(r,totals.get(r)!,weights.get(r)!)-r.cost+(r.a.kind==='charge'?-35:0)})).sort((a,b)=>b.value-a.value);
+  // A timed-out world is ignored, but previous complete, paired worlds still
+  // carry information. Blend partial coverage with the previous depth.
+  const minimum=targetDepth===2?games.length:Math.ceil(games.length/2);
+  if(completed<minimum)break;
+  rounds+=completed;depth=targetDepth;
+  const coverage=completed/games.length;
+  const scores=active.map(r=>{
+   const searched=combined(r,totals.get(r)!,weights.get(r)!)-r.cost+(r.a.kind==='charge'?-35:0);
+   return {a:r.a,value:coverage*searched+(1-coverage)*r.value};
+  }).sort((a,b)=>b.value-a.value);
   candidates=active.map(r=>({...r,value:scores.find(s=>s.a===r.a)!.value})).sort((a,b)=>b.value-a.value);
   const close=scores.filter(s=>s.value>=scores[0].value-(difficulty==='master'?3:0));best=close[Math.floor(rng()*close.length)].a;
   if(expired())break;

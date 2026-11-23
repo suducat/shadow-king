@@ -17,3 +17,17 @@
 }
 
 .scene-host > .board-ink { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; pointer-events:none; }
+
+/* Keep mixed Han text, counters and icons on the same visual line. */
+.header-center, .player-title, .skill-context button, .chronicle-trigger,
+.rite-explainer summary, .menu-links button { line-height: 1.4; }
+.round-counter, .quiet-count, .fallen-counter, .compact-status { font-variant-numeric: tabular-nums; }
+.round-counter strong, .round-counter small, .quiet-count strong, .quiet-count small {
+ display: inline-block;
+ line-height: 1.35;
+ vertical-align: baseline;
+}
+.mode-card strong, .mode-card small, .difficulty-card strong, .difficulty-card small {
+ line-height: 1.45;
+}
+.rite-explainer svg { vertical-align: middle; }

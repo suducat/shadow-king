@@ -6,7 +6,7 @@ import {resolvePick} from '../src/interaction';
 import type {Game} from '../src/game';
 import {strategicFixture,baitHistory} from './ai-v05-fixtures';
 function proofGame():Game{return{pieces:[{id:'r-k',side:'red',role:'king',x:3,y:5,revealed:true},{id:'r-g',side:'red',role:'guard',x:0,y:0,revealed:true},{id:'b-k',side:'blue',role:'king',x:6,y:0},{id:'b-g',side:'blue',role:'guard',x:0,y:1}],mode:'ritual',ritual:{red:{phase:'open',openedPly:8},blue:{phase:'dormant'}},turn:'red',ply:10,quiet:0,captures:[],seen:{},result:null};}
-test('formal release carries the reviewed AI version',()=>assert.equal(AI_BUILD_ID,'v0.6.0'));
+test('AI version identifies the updated difficulty ladder',()=>assert.equal(AI_BUILD_ID,'v0.9.0'));
 test('rite proof preserves a purge counter-win before occupation resolves',()=>assert.equal(forcedRiteLoss(proofGame(),'blue').loss,false));
 test('rite proof finds a safe altar entry with no winning defensive reply',()=>{const g=proofGame();g.pieces=g.pieces.filter(p=>p.id!=='r-g');assert.equal(forcedRiteLoss(g,'blue').loss,true);});
 test('actual capture coverage prevents an altar loss certificate',()=>{const g=proofGame();g.pieces=g.pieces.filter(p=>p.id!=='r-g').map(p=>p.id==='b-g'?{...p,x:3,y:3}:p);assert.equal(forcedRiteLoss(g,'blue').loss,false);});

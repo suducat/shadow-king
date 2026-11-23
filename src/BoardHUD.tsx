@@ -19,18 +19,20 @@ export function BoardHUD({scene,game,pieces,selected,legal,chargeIntent,canAct,c
  const danger=(p:VisiblePiece)=>p.role!=='unknown'&&(p.role==='king'||p.id===selected?.id)&&threatened(p);
  const badges=pieces.filter(p=>danger(p)||p.charging||(p.role==='king'&&p.revealed&&game.ritual?.[p.side].phase!=='dormant'));
  useEffect(()=>{
+  if(!guard&&!badges.length)return;
   let frame=0;const tick=()=>{
    const board=scene.current;
    if(board){
+    const projection=board.hudProjection();
     for(const p of badges){const el=labels.current.get(p.id);if(!el)continue;
      const drawing=board.transition?.execution&&board.transition.id===p.id;
      el.style.visibility=drawing?'hidden':'';
      if(drawing)continue;
-     const at=board.projectActor(p.id,1.55);if(at){el.style.left=`${Math.min(innerWidth-75,Math.max(75,at.x))}px`;el.style.top=`${at.y}px`;}}
+     const at=projection.actor(p.id,1.55);if(at){el.style.left=`${Math.min(innerWidth-75,Math.max(75,at.x))}px`;el.style.top=`${at.y}px`;}}
     if(panel.current&&guard){
-     const at=board.projectActor(guard.id,1),el=panel.current;if(at){const w=el.offsetWidth,h=el.offsetHeight,minY=94,maxY=Math.max(minY,innerHeight-h-12);
+     const at=projection.actor(guard.id,1),el=panel.current;if(at){const w=el.offsetWidth,h=el.offsetHeight,minY=94,maxY=Math.max(minY,innerHeight-h-12);
       const candidates=[{x:at.x-w/2,y:at.y-h-45},{x:at.x+48,y:at.y-h/2},{x:at.x-w-48,y:at.y-h/2},{x:at.x-w/2,y:at.y+55}];
-      const obstacles=legal.map(p=>{const corners=[board.projectCell(p.x-.45,p.y-.45),board.projectCell(p.x+.45,p.y+.45),board.projectCell(p.x-.45,p.y+.45),board.projectCell(p.x+.45,p.y-.45),board.projectCell(p.x,p.y,1.45)];return{left:Math.min(...corners.map(q=>q.x))-8,right:Math.max(...corners.map(q=>q.x))+8,top:Math.min(...corners.map(q=>q.y))-8,bottom:Math.max(...corners.map(q=>q.y))+8};});
+      const obstacles=legal.map(p=>{const corners=[projection.cell(p.x-.45,p.y-.45),projection.cell(p.x+.45,p.y+.45),projection.cell(p.x-.45,p.y+.45),projection.cell(p.x+.45,p.y-.45),projection.cell(p.x,p.y,1.45)];return{left:Math.min(...corners.map(q=>q.x))-8,right:Math.max(...corners.map(q=>q.x))+8,top:Math.min(...corners.map(q=>q.y))-8,bottom:Math.max(...corners.map(q=>q.y))+8};});
       if(obstacles.length){const left=Math.min(...obstacles.map(p=>p.left)),right=Math.max(...obstacles.map(p=>p.right)),top=Math.min(...obstacles.map(p=>p.top)),bottom=Math.max(...obstacles.map(p=>p.bottom));candidates.push({x:left-w-12,y:at.y-h/2},{x:right+12,y:at.y-h/2},{x:at.x-w/2,y:top-h-12},{x:at.x-w/2,y:bottom+12});}
       const scored=candidates.map(c=>{const x=Math.max(10,Math.min(innerWidth-w-10,c.x)),y=Math.max(minY,Math.min(maxY,c.y));const overlap=obstacles.filter(p=>p.right>x&&p.left<x+w&&p.bottom>y&&p.top<y+h).length;return{x,y,score:overlap*10000+Math.abs(x+w/2-at.x)+Math.abs(y+h/2-at.y)+Math.abs(x-c.x)+Math.abs(y-c.y)};}).sort((a,b)=>a.score-b.score);
       el.style.left=`${scored[0].x}px`;el.style.top=`${scored[0].y}px`;

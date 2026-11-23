@@ -26,27 +26,35 @@ function restoreClassicRepetition(g:Game,h:PublicAction[]){if(g.mode==='ritual')
 export function decideOmniscient(o:Observation,options:SearchOptions={}):Decision{
  const started=performance.now(),side=o.side,foe=other(side),b=inferIdentities(o,false),g=worldGame(o,b,b.worlds[0]);if(o.repetition)g.seen={...o.repetition};else restoreClassicRepetition(g,o.history);
  const legal=allActions(g),complex=legal.some(a=>a.kind==='execute'||g.pieces.some(p=>p.side===foe&&p.x===a.x&&p.y===a.y))||!!g.ritual&&Object.values(g.ritual).some(r=>r.phase==='open'||r.phase==='occupied');
- const maxMillis=Math.min(5000,options.maxMillis??(complex?4200:1900)),budget=options.nodeBudget??110000,deadline=started+maxMillis;
+ const maxMillis=Math.min(5000,options.maxMillis??(complex?4400:2350)),budget=options.nodeBudget??110000,deadline=started+maxMillis;
  let nodes=0,policyNodes=0,depthDone=0,tableHits=0;const expired=()=>nodes+policyNodes>=budget||performance.now()>=deadline;
  const result=(action:Action|null):Decision=>({action,nodes:nodes+policyNodes,samples:1,elapsed:performance.now()-started,algorithm:'asymmetric informed expectimax + public opponent policy + iterative TT search',diagnostics:{depth:depthDone,rounds:tableHits,worlds:1,entropy:0,style:0,inferenceStates:policyNodes}});
  if(o.ended||g.turn!==side||!legal.length)return result(null);
  const step=(s:Game,a:Action)=>{nodes++;return act(s,a);};
- const evaluate=(s:Game,ply=0)=>{if(s.result)return s.result.winner===null?0:s.result.winner===side?1000000-ply*100:-1800000+ply*100;let v=evaluateStrategy(s,side);
-  const mobility=(who:Side)=>{const k=s.pieces.find(p=>p.side===who&&p.role==='king');if(!k)return 0;const enemies=attacks(s,other(who));return [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>{const x=k.x+dx,y=k.y+dy;return x>=0&&x<7&&y>=0&&y<7&&!s.pieces.some(p=>p.side===who&&p.x===x&&p.y===y)&&!enemies.has(`${x}/${y}`);}).length;};
+ const staticScores=new WeakMap<Game,number>();
+ const evaluate=(s:Game,ply=0)=>{if(s.result)return s.result.winner===null?0:s.result.winner===side?1000000-ply*100:-1800000+ply*100;
+  const cached=staticScores.get(s);if(cached!==undefined)return cached;
+  let v=evaluateStrategy(s,side);
+  const ownAttacks=attacks(s,side),opponentAttacks=attacks(s,foe);
+  const mobility=(who:Side)=>{const k=s.pieces.find(p=>p.side===who&&p.role==='king');if(!k)return 0;const enemies=who===side?opponentAttacks:ownAttacks;return [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>{const x=k.x+dx,y=k.y+dy;return x>=0&&x<7&&y>=0&&y<7&&!s.pieces.some(p=>p.side===who&&p.x===x&&p.y===y)&&!enemies.has(`${x}/${y}`);}).length;};
   // An extra royal exit matters most when the king is boxed in.
   // Flat rewards for every exit previously pulled the king out before
   // the screening pieces and made harmless king shuffles attractive.
-  const escapeValue=[-190,0,85,110,120];
+  const escapeValue=[-265,0,100,135,150];
   v+=escapeValue[mobility(side)]-escapeValue[mobility(foe)];
   // A hidden crown is still a crown. Do not use it as the nearest hunter:
   // spending its escape squares to chase a target caused avoidable encirclement.
   const king=s.pieces.find(p=>p.side===side&&p.role==='king');
-  if(king){const ring=s.pieces.filter(p=>p.side===foe&&Math.abs(p.x-king.x)+Math.abs(p.y-king.y)<=2).length;v-=ring*145+Math.max(0,ring-1)*180;}
+  if(king){const ring=s.pieces.filter(p=>p.side===foe&&Math.abs(p.x-king.x)+Math.abs(p.y-king.y)<=2).length;v-=ring*155+Math.max(0,ring-1)*235;}
   for(const p of s.pieces.filter(p=>p.side===side&&p.role==='guard')){const exposed=s.pieces.filter(q=>q.side===foe&&Math.abs(q.x-p.x)+Math.abs(q.y-p.y)<=2).length;if(p.charging&&exposed)v-=100+exposed*65;}
 
-  const target=s.pieces.find(p=>p.side===foe&&p.role==='king');let our=s.pieces.filter(p=>p.side===side&&p.role!=='king');if(!our.length)our=s.pieces.filter(p=>p.side===side);if(target){const distances=our.map(p=>Math.abs(p.x-target.x)+Math.abs(p.y-target.y));v+=Math.max(0,10-Math.min(...distances))*22+distances.filter(d=>d<=2).length*35;}
+  const target=s.pieces.find(p=>p.side===foe&&p.role==='king');let our=s.pieces.filter(p=>p.side===side&&p.role!=='king');if(!our.length)our=s.pieces.filter(p=>p.side===side);if(target){const distances=our.map(p=>Math.abs(p.x-target.x)+Math.abs(p.y-target.y));
+  v+=Math.max(0,10-Math.min(...distances))*32+distances.filter(d=>d<=2).length*50;
+  const safeApproach=our.filter(p=>!opponentAttacks.has(`${p.x}/${p.y}`)).map(p=>Math.abs(p.x-target.x)+Math.abs(p.y-target.y));
+  v+=Math.max(0,7-Math.min(7,...safeApproach))*19;}
   const guards=s.pieces.filter(p=>p.side===foe&&p.role==='guard');if(our.length&&guards.length){const distances=guards.map(t=>Math.min(...our.map(p=>Math.abs(p.x-t.x)+Math.abs(p.y-t.y))));v+=distances.reduce((n,d)=>n+Math.max(0,7-d)*(guards.length===1?65:15),0);}
-  return Math.max(-60000,Math.min(60000,v));};
+  const bounded=Math.max(-60000,Math.min(60000,v));
+  staticScores.set(s,bounded);return bounded;};
  type Root={a:Action;next:Game;score:number;risk:boolean;checked:boolean;h:PublicAction[]};
  const roots:Root[]=legal.map(a=>{const n=step(g,a);return{a,next:n,h:append(g,a,n,o.history),score:evaluate(n,1)-habitCost(o,a),checked:!!n.result,risk:n.result?.winner===foe};});
  for(const r of roots)if(r.next.result?.winner===side)return result(r.a);
@@ -94,18 +102,20 @@ export function decideOmniscient(o:Observation,options:SearchOptions={}):Decisio
     v+=p.probability*Math.min(score,12000);
     // Hedge against a skilled responder choosing a strong public candidate.
     // Eligibility comes from the responder’s masked policy, not our knowledge.
-    if(p.probability>=policy[0].probability*.4)worstCredible=Math.min(worstCredible,score);
+    if(p.probability>=policy[0].probability*.3||p.forcing&&p.probability>=policy[0].probability*.12)worstCredible=Math.min(worstCredible,score);
    }
    if(worstReply>12000&&Number.isFinite(worstReply))v=worstReply;
-   else if(Number.isFinite(worstCredible))v=.65*v+.35*Math.min(12000,worstCredible);
+   else if(Number.isFinite(worstCredible))v=.45*v+.55*Math.min(12000,worstCredible);
   }
   if(!expired()&&tt.size<25000)tt.set(key,{depth,value:v});return v;
  };
  for(let depth=1;depth<=8&&!expired();depth++){
   const scored:Root[]=[];
-  for(const r of pool){if(expired())break;const score=tree(r.next,r.h,depth-1,1)-habitCost(o,r.a);scored.push({...r,score});}
-  if(expired()||scored.length!==pool.length)break;
-  scored.sort((a,b)=>b.score-a.score);best=scored[0].a;depthDone=depth;pool.splice(0,pool.length,...scored);
+  const width=depth<=2?pool.length:Math.min(pool.length,depth===3?7:4);
+  const active=pool.slice(0,width);
+  for(const r of active){if(expired())break;const score=tree(r.next,r.h,depth-1,1)-habitCost(o,r.a);scored.push({...r,score});}
+  if(expired()||scored.length!==active.length)break;
+  scored.sort((a,b)=>b.score-a.score);best=scored[0].a;depthDone=depth;pool.splice(0,active.length,...scored);
   if(scored[0].score>900000)break;
  }
  return result(best);

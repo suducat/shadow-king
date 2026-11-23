@@ -4,9 +4,21 @@ import type {Observation} from './ai';
 export const distance=(a:{x:number;y:number},b:{x:number;y:number})=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 export const altarDistance=(p:{x:number;y:number})=>Math.max(0,2-p.x,p.x-4)+Math.max(0,2-p.y,p.y-4);
 const cells=Array.from({length:9},(_,i)=>({x:2+i%3,y:2+Math.floor(i/3)}));
+const cardinal=[[1,0],[-1,0],[0,1],[0,-1]] as const;
 export function attacks(g:Game,side:Side):Map<string,number>{
- const map=new Map<string,number>();const add=(x:number,y:number)=>{if(x>=0&&x<7&&y>=0&&y<7&&!g.pieces.some(p=>p.side===side&&p.x===x&&p.y===y))map.set(`${x}/${y}`,(map.get(`${x}/${y}`)??0)+1);};
- for(const p of g.pieces.filter(p=>p.side===side)){for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]])add(p.x+dx,p.y+dy);if(p.charging&&p.charging.readyPly<=g.ply+(g.turn===side?0:1))for(const at of executionPath(g,p.id))add(at.x,at.y);}return map;
+ const map=new Map<string,number>(),own=g.pieces.filter(p=>p.side===side);
+ const occupied=new Uint8Array(49);
+ for(const p of own)occupied[p.y*7+p.x]=1;
+ const add=(x:number,y:number)=>{
+  if(x<0||x>=7||y<0||y>=7||occupied[y*7+x])return;
+  const cell=`${x}/${y}`;map.set(cell,(map.get(cell)??0)+1);
+ };
+ const actionablePly=g.ply+(g.turn===side?0:1);
+ for(const p of own){
+  for(const [dx,dy] of cardinal)add(p.x+dx,p.y+dy);
+  if(p.charging&&p.charging.readyPly<=actionablePly)for(const at of executionPath(g,p.id))add(at.x,at.y);
+ }
+ return map;
 }
 export function chargeMeaning(g:Game,p:Piece,publicOnly=false):number{
  if(!p.charging)return 0;const path=executionPath(g,p.id);if(!path.length)return -130;

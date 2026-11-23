@@ -15,13 +15,13 @@ export function inferIdentities(o:Observation,behavior=true):Belief{
  // must not turn an earlier quiet advance into evidence of a deliberate offer.
  const defenders=new Map(o.pieces.filter(p=>p.side===o.side).map(p=>[p.id,{x:p.x,y:p.y}]));
  const offers=new Map<string,number>();
- for(let i=o.history.length-1;i>=0;i--){
+ if(behavior)for(let i=o.history.length-1;i>=0;i--){
   const h=o.history[i];
   if(h.side===o.side){if(defenders.has(h.id))defenders.set(h.id,h.from);continue;}
   if(!h.captured&&Array.from(defenders.values()).some(q=>dist(h.to,q)===1))
    offers.set(h.id,(offers.get(h.id)??0)+1);
  }
- const evidence=unknown.map(p=>{
+ const evidence=behavior?unknown.map(p=>{
   const home=enemy==='red'?6:0,progress=Math.abs(p.y-home);
   const moves=o.history.filter(h=>h.id===p.id);
   const advances=moves.filter(h=>!h.captured&&Math.abs(h.to.y-home)>Math.abs(h.from.y-home)).length;
@@ -34,7 +34,7 @@ export function inferIdentities(o:Observation,behavior=true):Belief{
   const bound=(n:number)=>Math.max(-2.4,Math.min(2.4,n));
   return {king:bound(sheltered-rush*.65-offered),guard:bound(sheltered*.55+Math.min(2,captures)*.25-offered*.28),
    martyr:bound(rush+offered-sheltered-Math.min(2,captures)*.18)};
- });
+ }):[];
  const worlds:IdentityWorld[]=[];
  const visit=(i:number,assigned:Role[],log:number)=>{
   if(i===unknown.length){worlds.push({roles:[...assigned],weight:Math.exp(log)});return;}
