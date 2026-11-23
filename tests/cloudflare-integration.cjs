@@ -106,8 +106,25 @@ async function begin(pair,blueLine=line){
   red.ws.send('ping');await red.take(m=>m.type==='pong');
   red.send({type:'ready',value:true});await blue.state(s=>s.otherReady);
   red.send({type:'ready',value:false});await blue.state(s=>!s.otherReady,1);
+  const profiles={red:{id:'0123456789ab',nickname:'石榴'},blue:{id:'abcdef012345',nickname:'远星'}};
+  red.send({type:'profile',profile:{...profiles.red,token:'not public'}});
+  blue.send({type:'profile',profile:profiles.blue});
+  await both(pair,s=>s.profiles?.red?.id===profiles.red.id&&s.profiles?.blue?.id===profiles.blue.id);
   let [sRed,sBlue]=await begin(pair,['king','guard','martyr','guard','martyr','guard','martyr']);
   assert.equal(sRed.matchId,sBlue.matchId);
+  assert.deepEqual(sRed.profiles,profiles);
+  assert.deepEqual(sBlue.profiles,profiles);
+  const interact=(sender,kind,id,matchId=sRed.matchId)=>sender.send({type:'interaction',kind,id,matchId});
+  interact(red,'whisper',0,'old-match');
+  interact(red,'whisper',99);
+  interact(red,'whisper',0);
+  interact(red,'emote',0);
+  const whisper=await blue.take(m=>m.type==='interaction');
+  assert.deepEqual(whisper,{type:'interaction',kind:'whisper',id:0,side:'red',matchId:sRed.matchId});
+  interact(blue,'emote',2);
+  assert.equal((await red.take(m=>m.type==='interaction')).id,2);
+  assert.equal(blue.frames.filter(m=>m.type==='interaction').length,1);
+
   assert.ok(!('seen' in sRed.game));
   assert.ok(sRed.game.pieces.filter(p=>p.side==='blue').every(p=>p.role==='unknown'));
   assert.ok(sBlue.game.pieces.filter(p=>p.side==='red').every(p=>p.role==='unknown'));
@@ -123,6 +140,8 @@ async function begin(pair,blueLine=line){
   blue=client(url,blueTicket);pair=[red,blue];
   sBlue=await blue.state(s=>s.game?.ply===1&&s.opponentConnected);
   assert.equal(sBlue.lastTurn.actionId,first.intent.actionId);
+  assert.deepEqual(sBlue.profiles,profiles);
+  assert.ok(!blue.frames.some(m=>m.type==='interaction'));
   red.send(first);await red.take(m=>m.type==='ack'&&m.actionId===first.intent.actionId);
   assert.equal((await blue.state(s=>s.game?.ply===1)).game.ply,1);
   pair.forEach(c=>c.ws.terminate());await dev.stop();

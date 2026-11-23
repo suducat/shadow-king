@@ -1,5 +1,5 @@
 import {DurableObject} from 'cloudflare:workers';
-import {COURT_SOCKET,COURT_VERSION,ROOM_TTL,type RoomTicket} from '../../src/court-protocol';
+import {COURT_COOLDOWN,readInteraction,readProfile,COURT_SOCKET,COURT_VERSION,ROOM_TTL,type RoomTicket} from '../../src/court-protocol';
 import {other,type Side} from '../../src/game';
 import {advanceDeadline,applyCommand,expireBlue,newRoom,reserveBlue,roomSnapshot,type Room,type Seat} from './room-state';
 
@@ -193,6 +193,23 @@ export class CourtRoom extends DurableObject<Env>{
      ws.close(4000,'seat left');return;
     }
     await this.shutdown('对方暂离王庭');return;
+   }
+   if(command&&typeof command==='object'&&'type' in command){
+    if(command.type==='profile'){
+     const profile=readProfile('profile' in command?command.profile:null);
+     if(!profile||room.stage!=='waiting'||(seat.profile?.id===profile.id&&seat.profile.nickname===profile.nickname))return;
+     seat.profile=profile;await this.save(room);this.broadcast(room);return;
+    }
+    if(command.type==='interaction'){
+     const interaction=readInteraction(command);
+     if(!interaction||room.stage!=='playing'||!room.game||room.game.result||
+      !('matchId' in command)||command.matchId!==room.matchId||now-(seat.lastInteraction??0)<COURT_COOLDOWN)return;
+     const peers=this.sockets(room,other(identity.side));
+     if(!peers.length)return;
+     seat.lastInteraction=now;await this.ctx.storage.put('room',room);
+     for(const peer of peers)this.send(peer,{type:'interaction',...interaction,side:identity.side,matchId:room.matchId});
+     return;
+    }
    }
    const outcome=applyCommand(room,identity.side,command,now,this.sockets(room,other(identity.side)).length>0);
    if(outcome.changed){await this.save(room,true);this.broadcast(room);}

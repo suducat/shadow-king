@@ -25,6 +25,12 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
    await p.getByRole('button',{name:/王庭邀约/}).click();
   }));
   const [red,blue]=pages;
+  const names=['赤星','蓝月'];
+  const ids=await Promise.all(pages.map(async(p,i)=>{
+   await p.getByLabel('昵称',{exact:true}).fill(names[i]);
+   await button(p,'保存昵称').click();
+   return p.locator('.court-profile .court-player-id').textContent();
+  }));
   await red.getByRole('button',{name:/发起邀约/}).click();
   const code=await red.locator('.court-code').textContent();
   assert.match(code,/^\d{6}$/);
@@ -32,6 +38,9 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   await blue.getByLabel('邀约密令').fill(code);
   await button(blue,'确认入局').click();
   await Promise.all(pages.map(p=>p.getByRole('heading',{name:'双王就位'}).waitFor()));
+  for(const p of pages){
+   for(const name of names)await p.locator('.court-ready').getByText(name,{exact:true}).waitFor();
+  }
   await button(red,'就位').click();
   await button(blue,'就位').click();
   await Promise.all(pages.map(p=>p.waitForSelector('.phase-setup')));
@@ -42,6 +51,26 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   await Promise.all(pages.map(p=>p.waitForSelector('.phase-play')));
   await Promise.all(pages.map(p=>settled(p,0)));
   assert.equal(redIds.length,7);
+  for(const p of pages){
+   for(const id of ids)await p.locator('.court-social').getByText(id,{exact:true}).waitFor();
+   await p.locator('.court-interactions summary').click();
+  }
+  const phrases=['漂亮的一步。','你确定吗？','我已看穿你的布局。','这正合我意。','你所见的，未必是真相。','王，就在你眼前。','竟然如此……','胜负尚未注定。'];
+  const emotes=['王笑','王哭','王疑问'];
+  for(const [i,label] of [...phrases,...emotes].entries()){
+   const [sender,receiver]=i%2?[blue,red]:[red,blue];
+   await button(sender,label).click();
+   assert.ok(await button(sender,label).isDisabled());
+   const bubble=receiver.locator('.court-bubble');
+   if(i<phrases.length)await bubble.getByText(label,{exact:true}).waitFor();
+   else await bubble.getByRole('img',{name:label}).waitFor();
+  }
+  await red.getByLabel('接收王庭互动').uncheck();
+  await button(blue,phrases[0]).click();
+  await blue.waitForTimeout(500);
+  assert.equal(await red.locator('.court-bubble').count(),0);
+  assert.equal(await red.evaluate(()=>localStorage.getItem('shadow-king-court-muted')),'true');
+  for(const p of pages)await p.locator('.court-interactions summary').click();
   await key(red,0,6);await key(red,0,5);
   await Promise.all(pages.map(p=>settled(p,1)));
   await blue.evaluate(()=>window.courtSockets.at(-1).close(4007,'test interruption'));

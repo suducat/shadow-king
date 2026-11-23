@@ -1,3 +1,7 @@
+import {CourtReception} from './CourtSocial';
+import {courtProfile,saveProfile} from './court-profile';
+import {readProfile} from './court-protocol';
+import {sideName} from './game';
 import {useState,type FormEvent} from 'react';
 import {ArrowLeft,ChevronRight,Copy,Crown,KeyRound,DoorOpen} from 'lucide-react';
 import type {CourtSession} from './court-session';
@@ -5,9 +9,11 @@ import type {GameMode} from './ritual';
 import type {Side} from './game';
 
 type Props={rule:GameMode;room:CourtSession['state']|null;
- begin:(side:Side,code?:string)=>void;toggle:()=>void;cancel:()=>void;reconnect:()=>void;back:()=>void};
+ begin:(side:Side,code?:string)=>void;toggle:()=>void;cancel:()=>void;reconnect:()=>void;back:()=>void;profileChanged:()=>void};
 
-export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back}:Props){
+export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back,profileChanged}:Props){
+ const [profile,setProfile]=useState(courtProfile);
+ const [nickname,setNickname]=useState(profile.nickname);
  const [join,setJoin]=useState(false);
  const [secret,setSecret]=useState('');
  const [copied,setCopied]=useState('');
@@ -25,6 +31,12 @@ export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back}:Prop
    <button className="mode-card" onClick={()=>begin('red')}><Crown size={27}/><div><strong>发起邀约</strong><small>设下棋局，静候另一位执棋者。</small></div><ChevronRight size={20}/></button>
    <button className="mode-card" onClick={()=>setJoin(true)}><DoorOpen size={27}/><div><strong>应邀入局</strong><small>凭密令进入另一座王庭。</small></div><ChevronRight size={20}/></button>
   </>}
+  <form className="court-profile" onSubmit={e=>{
+   e.preventDefault();const next=readProfile({...profile,nickname});if(!next)return;
+   saveProfile(next);setProfile(next);setNickname(next.nickname);profileChanged();
+  }}><label htmlFor="court-nickname">昵称</label><input id="court-nickname" maxLength={24} value={nickname} onChange={e=>setNickname(e.target.value)} />
+   <button className="secondary" disabled={nickname===profile.nickname}>保存昵称</button><small className="court-player-id">ID {profile.id}</small></form>
+  <CourtReception/>
   {waiting&&<div className="court-invitation">
    <span>邀约密令</span><strong className="court-code" aria-label="邀约密令">{room.code}</strong>
    <button className="secondary" onClick={async()=>{
@@ -49,7 +61,8 @@ export function CourtSummons({rule,room,begin,toggle,cancel,reconnect,back}:Prop
    <p role="status" className="court-message">{room.starting?'棋局启幕':'应邀者已至'}</p>
    {(['red','blue'] as const).map(side=>{
     const local=side===room.side,placed=local?room.ready:room.otherReady;
-    return <div key={side} className={side}><Crown size={19}/><strong>{side==='red'?'红方王庭':'蓝方王庭'}</strong>
+    return <div key={side} className={side}><Crown size={19}/><strong>{sideName[side]}</strong>
+     <span className="court-ready-profile">{room.profiles?.[side]?.nickname??(local?profile.nickname:'执棋者')}<small className="court-player-id">{room.profiles?.[side]?.id??(local?profile.id:'')}</small></span>
      <span>{placed?(local?'己方就位':'对方就位'):'未就位'}</span></div>;
    })}
    <button className="primary" onClick={toggle} disabled={room.starting}>{room.ready?'取消就位':'就位'}</button>

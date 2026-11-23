@@ -1,8 +1,8 @@
 import {act,createGame,other,positionKey,ROLES,startGame,viewFor,type Game,type Role,type Side} from '../../src/game';
-import {DEPLOYMENT_MS,ROOM_TTL,SEAT_RESERVATION_MS,type CourtSnapshot,type CourtIntent,type CourtNotice} from '../../src/court-protocol';
+import {DEPLOYMENT_MS,ROOM_TTL,SEAT_RESERVATION_MS,type CourtProfile,type CourtSnapshot,type CourtIntent,type CourtNotice} from '../../src/court-protocol';
 import type {GameMode} from '../../src/ritual';
 
-export type Seat={playerId:string;token:string;socketId?:string;reservedUntil?:number};
+export type Seat={playerId:string;token:string;socketId?:string;reservedUntil?:number;profile?:CourtProfile;lastInteraction?:number};
 export type Room={
  code:string;rule:GameMode;expires:number;revision:number;seats:{red:Seat;blue?:Seat};
  ready:Record<Side,boolean>;rematch:Record<Side,boolean>;deployment:Record<Side,boolean>;
@@ -115,7 +115,7 @@ export function roomSnapshot(room:Room,side:Side,online:boolean):CourtSnapshot{
   const {seen:_,pieces:__,...publicState}=room.game;
   game={...publicState,pieces:viewFor(room.game,side)};
  }
- return {type:'state',revision:room.revision,serverNow:Date.now(),rule:room.rule,stage:room.stage==='waiting'&&online?'ready':room.stage,
+ return {type:'state',profiles:{red:room.seats.red.profile,blue:room.seats.blue?.profile},revision:room.revision,serverNow:Date.now(),rule:room.rule,stage:room.stage==='waiting'&&online?'ready':room.stage,
   matchId:room.matchId,game,lastTurn:room.lastTurn,ready:room.ready[side],otherReady:room.ready[other(side)],
   opponentConnected:online,deploymentUntil:room.deploymentUntil,deploymentLocked:room.deployment[side],
   rematchRequested:room.rematch[side],opponentRematch:room.rematch[other(side)]};

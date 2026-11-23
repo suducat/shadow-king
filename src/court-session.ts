@@ -1,5 +1,6 @@
+import {courtMuted,courtProfile} from './court-profile';
 import {type Game,type Role,type Side} from './game';
-import {COURT_SOCKET,COURT_VERSION,type CourtCommand,type CourtIntent,type CourtNotice,type CourtSnapshot,type ProjectedGame,type RoomTicket} from './court-protocol';
+import {COURT_COOLDOWN,readInteraction,type CourtInteraction,COURT_SOCKET,COURT_VERSION,type CourtCommand,type CourtIntent,type CourtNotice,type CourtSnapshot,type ProjectedGame,type RoomTicket} from './court-protocol';
 import type {GameAction,GameMode} from './ritual';
 
 const interrupted='与王庭的连接暂时中断';
@@ -8,6 +9,7 @@ const retryDelay=[400,800,1600,3200,6400];
 const endpoint=import.meta.env.VITE_MULTIPLAYER_URL?.trim();
 type State={
  stage:'opening'|'waiting'|'connecting'|'ready'|'deploying'|'playing'|'reconnecting'|'error';
+ profiles?:CourtSnapshot['profiles'];interaction?:CourtInteraction;sendUntil?:number;
  code:string;side:Side;ready:boolean;otherReady:boolean;starting:boolean;
  message:string;pending:boolean;rematchRequested:boolean;opponentRematch:boolean;
  deploymentUntil?:number;deploymentLocked?:boolean;opponentPaused?:boolean;reconnectable?:boolean;
@@ -82,11 +84,12 @@ export class CourtSession{
   const socket=new WebSocket(url,[COURT_SOCKET,`seat.${this.ticket.token}`]);
   this.socket=socket;
   this.deadline=setTimeout(()=>this.lost(socket),6000);
+  socket.addEventListener('open',()=>{if(this.socket===socket)this.sendRaw({type:'profile',profile:courtProfile()});});
   socket.addEventListener('message',event=>{
    if(this.closed||this.socket!==socket)return;
    clearTimeout(this.pongTimeout);
    if(event.data==='pong')return;
-   let data:CourtSnapshot|CourtNotice;
+   let data:CourtSnapshot|CourtNotice|CourtInteraction;
    try{data=JSON.parse(event.data);}catch{return;}
    if(data?.type==='state'&&data.rule===this.rule&&data.revision>this.revision){
     clearTimeout(this.deadline);this.failures=0;
@@ -96,6 +99,8 @@ export class CourtSession{
      catch{this.lost(socket);}
     },20_000);
     this.sync(data);
+   }else if(data?.type==='interaction'){
+    if(data.matchId===this.matchId&&data.side!==this.state.side&&readInteraction(data)&&!courtMuted())this.update({interaction:data});
    }else if(data?.type==='closed'){
     this.ticket=undefined;this.dropSocket();this.fail(data.message);
    }else if(data?.type==='error'){
@@ -135,7 +140,7 @@ export class CourtSession{
   this.lastStage=s.stage;
   const opponentPaused=(s.stage==='playing'||s.stage==='deploying')&&!s.opponentConnected&&!next?.result;
   const stage=s.stage==='waiting'&&this.state.side==='blue'?'connecting':s.stage;
-  this.update({stage,code:this.ticket!.code,ready:s.ready,otherReady:s.otherReady,opponentPaused,
+  this.update({stage,profiles:s.profiles,interaction:matchChanged?undefined:this.state.interaction,code:this.ticket!.code,ready:s.ready,otherReady:s.otherReady,opponentPaused,
    pending:!!this.outbox,reconnectable:false,rematchRequested:s.rematchRequested,opponentRematch:s.opponentRematch,
    deploymentUntil:s.deploymentUntil===undefined?undefined:Date.now()+Math.max(0,s.deploymentUntil-s.serverNow),
    deploymentLocked:s.deploymentLocked||!!this.deployment?.locked,
@@ -178,6 +183,11 @@ export class CourtSession{
   try{this.socket.send(JSON.stringify(command));return true;}catch{this.lost(this.socket);return false;}
  }
  private send(command:CourtCommand){return this.sendRaw(command);}
+ sendInteraction(kind:CourtInteraction['kind'],id:number){
+  if(this.state.stage!=='playing'||this.state.opponentPaused||this.game?.result||Date.now()<(this.state.sendUntil??0))return;
+  if(this.sendRaw({type:'interaction',kind,id,matchId:this.matchId}))this.update({sendUntil:Date.now()+COURT_COOLDOWN});
+ }
+ updateProfile(){this.sendRaw({type:'profile',profile:courtProfile()});}
  toggleReady(){if(this.state.stage==='ready')this.send({type:'ready',value:!this.state.ready});}
  updateDraft(draft:Game){
   if(this.lastStage!=='deploying'||this.state.deploymentLocked)return;
