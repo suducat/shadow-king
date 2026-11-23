@@ -5,6 +5,7 @@ import type {GameAction,GameMode} from './ritual';
 
 const interrupted='与王庭的连接暂时中断';
 const opponentAway='对方暂离王庭';
+const actionDeadline=2500;
 const retryDelay=[400,800,1600,3200,6400];
 const endpoint=import.meta.env.VITE_MULTIPLAYER_URL?.trim();
 type State={
@@ -29,6 +30,8 @@ export class CourtSession{
  private request?:AbortController;
  private retryTimer?:ReturnType<typeof setTimeout>;
  private deadline?:ReturnType<typeof setTimeout>;
+ private actionTimer?:ReturnType<typeof setTimeout>;
+ private actionAttempts=0;
  private heartbeat?:ReturnType<typeof setInterval>;
  private pongTimeout?:ReturnType<typeof setTimeout>;
  private failures=0;
@@ -106,11 +109,9 @@ export class CourtSession{
    }else if(data?.type==='closed'){
     this.ticket=undefined;this.dropSocket();this.fail(data.message);
    }else if(data?.type==='error'){
-    if(data.actionId&&this.outbox?.intent.actionId===data.actionId)this.outbox=undefined;
+    if(data.actionId&&this.outbox?.intent.actionId===data.actionId)this.clearAction();
     if(this.deployment?.locked&&this.state.stage==='deploying'&&!this.state.deploymentLocked)this.deployment.locked=false;
     this.update({message:data.message,pending:!!this.outbox});
-   }else if(data?.type==='ack'&&this.outbox?.intent.actionId===data.actionId){
-    this.outbox=undefined;this.update({pending:false});
    }
   });
   socket.addEventListener('error',()=>this.lost(socket));
@@ -125,8 +126,8 @@ export class CourtSession{
   const next=s.game?adaptGame(s.game):undefined,previous=this.game,matchChanged=s.matchId!==this.matchId;
   const resumed=this.state.stage==='reconnecting'||this.state.stage==='error';
   this.revision=s.revision;this.matchId=s.matchId;this.game=next;
-  if(matchChanged){this.outbox=undefined;this.replay=false;this.deployment=undefined;this.lastDraft='';}
-  if(this.outbox&&(s.lastTurn?.actionId===this.outbox.intent.actionId||!next||next.ply!==this.outbox.intent.turnNumber||next.result))this.outbox=undefined;
+  if(matchChanged){this.clearAction();this.deployment=undefined;this.lastDraft='';}
+  if(this.outbox&&(s.lastTurn?.actionId===this.outbox.intent.actionId||!next||next.ply!==this.outbox.intent.turnNumber||next.result))this.clearAction();
   // During deployment publish private local edits, but keep their UI in place
   // when other players change their readiness or a socket reconnects.
   if(next&&(matchChanged||this.lastStage!==s.stage||!previous)){
@@ -151,10 +152,10 @@ export class CourtSession{
   if(resumed&&s.stage==='deploying'&&this.deployment&&!s.deploymentLocked)
    this.send({type:this.deployment.locked?'deployment':'draft',matchId:this.matchId,line:this.deployment.line});
   if(s.stage!=='deploying')this.deployment=undefined;
-  if(this.replay&&this.outbox&&s.opponentConnected){this.replay=false;this.send(this.outbox);}
+  if(this.replay&&this.outbox&&s.opponentConnected)this.sendAction();
  }
  private dropSocket(){
-  clearTimeout(this.deadline);clearTimeout(this.pongTimeout);clearInterval(this.heartbeat);this.heartbeat=undefined;
+  clearTimeout(this.deadline);clearTimeout(this.actionTimer);clearTimeout(this.pongTimeout);clearInterval(this.heartbeat);this.heartbeat=undefined;
   const socket=this.socket;this.socket=undefined;
   socket?.close();
  }
@@ -168,7 +169,7 @@ export class CourtSession{
  }
  reconnect(){
   if(!this.ticket||this.closed||this.socket)return;
-  clearTimeout(this.retryTimer);this.failures=0;this.suspended=false;
+  clearTimeout(this.retryTimer);this.failures=0;this.actionAttempts=0;this.suspended=false;
   this.update({stage:'reconnecting',message:interrupted,reconnectable:true});this.connect();
  }
  suspend(){
@@ -177,7 +178,7 @@ export class CourtSession{
  close(){
   if(this.closed)return;
   if(this.socket?.readyState===WebSocket.OPEN)this.sendRaw({type:'leave'});
-  this.closed=true;this.ticket=undefined;this.outbox=undefined;this.request?.abort();
+  this.closed=true;this.ticket=undefined;this.clearAction();this.request?.abort();
   clearTimeout(this.retryTimer);this.dropSocket();
  }
  private sendRaw(command:unknown){
@@ -206,12 +207,29 @@ export class CourtSession{
   this.update({deploymentLocked:true});
   this.send({type:'deployment',matchId:this.matchId,line});
  }
+ private clearAction(){
+  clearTimeout(this.actionTimer);this.outbox=undefined;this.replay=false;this.actionAttempts=0;
+ }
+ private sendAction(){
+  const socket=this.socket,command=this.outbox;
+  if(!socket||!command)return;
+  this.replay=false;
+  if(!this.send(command)){this.replay=true;return;}
+  this.actionAttempts++;
+  // The acknowledgement alone cannot update the board. Keep the move until its snapshot arrives.
+  this.actionTimer=setTimeout(()=>{
+   if(this.outbox!==command||this.socket!==socket)return;
+   if(this.actionAttempts<3){this.lost(socket);return;}
+   this.dropSocket();this.replay=true;
+   this.fail('未能确认落子。重新连接后将同步棋局。',true);
+  },actionDeadline);
+ }
  private submit(action:GameAction|null){
   if(!this.ticket||!this.game||this.state.stage!=='playing'||this.state.opponentPaused||this.outbox||this.game.result)return;
   const intent:CourtIntent={matchId:this.matchId,actionId:crypto.randomUUID(),playerId:this.ticket.playerId,
    turnNumber:this.game.ply,sequenceNumber:this.game.ply+1,actionType:action?(action.kind??'move'):'resign',payload:action};
   this.outbox={type:'action',intent};this.update({pending:true});
-  if(!this.send(this.outbox))this.replay=!!this.outbox;
+  this.sendAction();
  }
  play(action:GameAction){this.submit(action);}
  resign(){this.submit(null);}

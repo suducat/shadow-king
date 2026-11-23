@@ -17,7 +17,16 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
     localStorage.setItem('shadow-king-settings',JSON.stringify({quality:'low',reduced:true,muted:true,music:0,effects:0}));
     const Real=window.WebSocket;window.courtSockets=[];
     window.WebSocket=class extends Real{
-     constructor(url,protocols){super(url,protocols);if(protocols?.includes('shadow-king-v1'))window.courtSockets.push(this);}
+     constructor(url,protocols){
+      super(url,protocols);
+      if(!protocols?.includes('shadow-king-v1'))return;
+      window.courtSockets.push(this);
+      this.addEventListener('message', event=>{
+       if(window.dropFirstMoveSnapshot!==this||event.data==='pong')return;
+       const message=JSON.parse(event.data);
+       if(message.type==='state'&&message.game?.ply===1)event.stopImmediatePropagation();
+      });
+     }
     };
    });
   }
@@ -28,8 +37,8 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   const [red,blue]=pages;
   const names=['赤星','蓝月'];
   await Promise.all(pages.map(async(p,i)=>{
-   await p.getByLabel('昵称',{exact:true}).fill(names[i]);
-   await button(p,'保存昵称').click();
+   await p.getByLabel('你在王庭的称呼',{exact:true}).fill(names[i]);
+   await button(p,'确认称呼').click();
   }));
   await red.getByRole('button',{name:/发起邀约/}).click();
   const code=await red.locator('.court-code').textContent();
@@ -80,7 +89,9 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
     await button(sender,'王庭密语').click();
    }
   }
+  await red.evaluate(()=>{window.dropFirstMoveSnapshot=window.courtSockets.at(-1);});
   await key(red,0,6);await key(red,0,5);
+  await red.waitForFunction(()=>window.courtSockets.length===2);
   await Promise.all(pages.map(p=>settled(p,1)));
   await blue.evaluate(()=>window.courtSockets.at(-1).close(4007,'test interruption'));
   await blue.getByRole('heading',{name:'与王庭的连接暂时中断'}).waitFor();
