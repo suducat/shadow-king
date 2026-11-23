@@ -31,7 +31,7 @@ function KingEmote({id}:{id:number}){
 
 export function CourtSocial({room,send}:{room:CourtSession['state'];send:(kind:CourtInteraction['kind'],id:number)=>void}){
  const [bubble,setBubble]=useState<CourtInteraction>();
- const [cooling,setCooling]=useState(false);
+ const [,refreshCooldown]=useState(0);
  const interaction=room.interaction;
  useEffect(()=>{
   setBubble(!courtMuted()?interaction:undefined);
@@ -41,12 +41,11 @@ export function CourtSocial({room,send}:{room:CourtSession['state'];send:(kind:C
  },[interaction]);
  useEffect(()=>{
   const remaining=(room.sendUntil??0)-Date.now();
-  setCooling(remaining>0);
   if(remaining<=0)return;
-  const timer=setTimeout(()=>setCooling(false),remaining);
+  const timer=setTimeout(()=>refreshCooldown(tick=>tick+1),remaining);
   return ()=>clearTimeout(timer);
  },[room.sendUntil]);
- const disabled=cooling||room.stage!=='playing'||room.opponentPaused;
+ const disabled=Date.now()<(room.sendUntil??0)||room.stage!=='playing'||room.opponentPaused;
  return <div className="court-social">
   <div className="court-social-players">{(['red','blue'] as const).map(side=><div key={side}>
    <small className={side}>{sideName[side]}</small><strong>{room.profiles?.[side]?.nickname??'执棋者'}</strong>

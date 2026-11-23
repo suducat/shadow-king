@@ -99,6 +99,8 @@ export class CourtSession{
      catch{this.lost(socket);}
     },20_000);
     this.sync(data);
+   }else if(data?.type==='interaction-sent'){
+    if(data.matchId===this.matchId)this.update({sendUntil:Date.now()+COURT_COOLDOWN});
    }else if(data?.type==='interaction'){
     if(data.matchId===this.matchId&&data.side!==this.state.side&&readInteraction(data)&&!courtMuted())this.update({interaction:data});
    }else if(data?.type==='closed'){

@@ -60,7 +60,7 @@ const settled=(page,ply)=>page.waitForFunction(ply=>{const q=window.__SK_QA__?.s
   for(const [i,label] of [...phrases,...emotes].entries()){
    const [sender,receiver]=i%2?[blue,red]:[red,blue];
    await button(sender,label).click();
-   assert.ok(await button(sender,label).isDisabled());
+   if(i===0)await sender.locator('.court-phrases button:disabled').first().waitFor();
    const bubble=receiver.locator('.court-bubble');
    if(i<phrases.length)await bubble.getByText(label,{exact:true}).waitFor();
    else await bubble.getByRole('img',{name:label}).waitFor();

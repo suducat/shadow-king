@@ -207,6 +207,7 @@ export class CourtRoom extends DurableObject<Env>{
      const peers=this.sockets(room,other(identity.side));
      if(!peers.length)return;
      seat.lastInteraction=now;await this.ctx.storage.put('room',room);
+     this.send(ws,{type:'interaction-sent',matchId:room.matchId});
      for(const peer of peers)this.send(peer,{type:'interaction',...interaction,side:identity.side,matchId:room.matchId});
      return;
     }

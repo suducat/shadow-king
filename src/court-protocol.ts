@@ -26,6 +26,7 @@ export type CourtSnapshot={
  deploymentUntil?:number;deploymentLocked:boolean;rematchRequested:boolean;opponentRematch:boolean;
 };
 export type CourtNotice=
+ |{type:'interaction-sent';matchId:string}
  |{type:'ack';actionId:string;sequenceNumber:number}
  |{type:'error';message:string;actionId?:string}
  |{type:'closed';message:string};
